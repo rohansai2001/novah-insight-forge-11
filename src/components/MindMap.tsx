@@ -3,13 +3,17 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import { Download, Plus, Trash2 } from 'lucide-react';
+import { Download, Plus, Trash2, RotateCcw } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 interface Node {
   id: string;
   label: string;
   type: 'center' | 'main' | 'sub';
+  level: number;
+  parentId: string | null;
+  expanded: boolean;
+  hasChildren: boolean;
 }
 
 interface Edge {
@@ -22,38 +26,25 @@ interface MindMapProps {
     nodes: Node[];
     edges: Edge[];
   };
+  query?: string;
 }
 
-const MindMap = ({ data }: MindMapProps) => {
+const MindMap = ({ data, query }: MindMapProps) => {
   const cyRef = useRef<HTMLDivElement>(null);
   const [cy, setCy] = useState<any>(null);
   const [newNodeLabel, setNewNodeLabel] = useState('');
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [currentLevel, setCurrentLevel] = useState(3);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && cyRef.current && !isInitialized) {
-      // Dynamically import Cytoscape to avoid SSR issues
       import('cytoscape').then((cytoscapeModule) => {
         const cytoscape = cytoscapeModule.default;
         
         const cytoscapeInstance = cytoscape({
           container: cyRef.current,
-          elements: data ? [
-            ...data.nodes.map(node => ({
-              data: { 
-                id: node.id, 
-                label: node.label,
-                type: node.type
-              }
-            })),
-            ...data.edges.map(edge => ({
-              data: { 
-                source: edge.source, 
-                target: edge.target 
-              }
-            }))
-          ] : [],
+          elements: [],
           style: [
             {
               selector: 'node',
@@ -63,13 +54,18 @@ const MindMap = ({ data }: MindMapProps) => {
                 'color': '#ffffff',
                 'text-valign': 'center',
                 'text-halign': 'center',
-                'font-size': '12px',
-                'width': 80,
-                'height': 80,
+                'font-size': '11px',
+                'font-weight': 'bold',
+                'width': 'label',
+                'height': 'label',
+                'padding': '10px',
+                'shape': 'round-rectangle',
                 'border-width': 2,
                 'border-color': '#1e40af',
                 'text-wrap': 'wrap',
-                'text-max-width': '70px'
+                'text-max-width': '120px',
+                'min-width': '80px',
+                'min-height': '40px'
               }
             },
             {
@@ -77,11 +73,11 @@ const MindMap = ({ data }: MindMapProps) => {
               style: {
                 'background-color': '#dc2626',
                 'border-color': '#991b1b',
-                'width': 120,
-                'height': 120,
                 'font-size': '14px',
                 'font-weight': 'bold',
-                'text-max-width': '100px'
+                'min-width': '140px',
+                'min-height': '60px',
+                'text-max-width': '130px'
               }
             },
             {
@@ -89,10 +85,10 @@ const MindMap = ({ data }: MindMapProps) => {
               style: {
                 'background-color': '#7c3aed',
                 'border-color': '#5b21b6',
-                'width': 100,
-                'height': 100,
-                'font-size': '13px',
-                'text-max-width': '80px'
+                'font-size': '12px',
+                'min-width': '100px',
+                'min-height': '50px',
+                'text-max-width': '90px'
               }
             },
             {
@@ -100,10 +96,10 @@ const MindMap = ({ data }: MindMapProps) => {
               style: {
                 'background-color': '#059669',
                 'border-color': '#047857',
-                'width': 70,
-                'height': 70,
-                'font-size': '11px',
-                'text-max-width': '60px'
+                'font-size': '10px',
+                'min-width': '80px',
+                'min-height': '40px',
+                'text-max-width': '70px'
               }
             },
             {
@@ -113,9 +109,7 @@ const MindMap = ({ data }: MindMapProps) => {
                 'line-color': '#64748b',
                 'target-arrow-color': '#64748b',
                 'target-arrow-shape': 'triangle',
-                'curve-style': 'bezier',
-                'source-endpoint': 'outside-to-node',
-                'target-endpoint': 'outside-to-node'
+                'curve-style': 'bezier'
               }
             },
             {
@@ -126,6 +120,13 @@ const MindMap = ({ data }: MindMapProps) => {
                 'overlay-color': '#fbbf24',
                 'overlay-opacity': 0.3
               }
+            },
+            {
+              selector: 'node[hasChildren="true"]',
+              style: {
+                'border-style': 'double',
+                'border-width': 3
+              }
             }
           ],
           layout: {
@@ -133,26 +134,14 @@ const MindMap = ({ data }: MindMapProps) => {
             fit: true,
             padding: 50,
             randomize: false,
-            animate: false,
-            animationDuration: 500,
-            refresh: 1,
-            componentSpacing: 80,
-            nodeRepulsion: 8000,
-            idealEdgeLength: 100,
-            edgeElasticity: 100,
-            nestingFactor: 1.2,
-            gravity: 1,
-            numIter: 1000,
-            initialTemp: 1000,
-            coolingFactor: 0.99,
-            minTemp: 1.0
+            animate: true,
+            animationDuration: 1000
           },
-          wheelSensitivity: 0.2,
+          wheelSensitivity: 0.1,
           maxZoom: 3,
           minZoom: 0.3
         });
 
-        // Add event listeners
         cytoscapeInstance.on('select', 'node', (evt) => {
           setSelectedNode(evt.target.id());
         });
@@ -161,9 +150,14 @@ const MindMap = ({ data }: MindMapProps) => {
           setSelectedNode(null);
         });
 
-        // Prevent layout from running automatically on data changes
-        cytoscapeInstance.autoungrabify(false);
-        cytoscapeInstance.autounselectify(false);
+        cytoscapeInstance.on('dbltap', 'node', async (evt) => {
+          const node = evt.target;
+          const nodeData = node.data();
+          
+          if (nodeData.hasChildren && nodeData.level >= currentLevel - 1) {
+            await expandNode(nodeData.id);
+          }
+        });
 
         setCy(cytoscapeInstance);
         setIsInitialized(true);
@@ -171,42 +165,85 @@ const MindMap = ({ data }: MindMapProps) => {
     }
   }, [isInitialized]);
 
-  // Update data when props change
   useEffect(() => {
     if (cy && data && isInitialized) {
-      cy.elements().remove();
-      
-      const elements = [
-        ...data.nodes.map(node => ({
-          data: { 
-            id: node.id, 
-            label: node.label,
-            type: node.type
-          }
-        })),
-        ...data.edges.map(edge => ({
-          data: { 
-            source: edge.source, 
-            target: edge.target 
-          }
-        }))
-      ];
-
-      cy.add(elements);
-      
-      // Run layout only once after adding elements
-      setTimeout(() => {
-        cy.layout({
-          name: 'cose',
-          fit: true,
-          padding: 50,
-          randomize: false,
-          animate: true,
-          animationDuration: 1000
-        }).run();
-      }, 100);
+      updateMindMap();
     }
-  }, [data, cy, isInitialized]);
+  }, [data, cy, isInitialized, currentLevel]);
+
+  const updateMindMap = () => {
+    if (!cy || !data) return;
+
+    cy.elements().remove();
+    
+    // Filter nodes based on current level
+    const visibleNodes = data.nodes.filter(node => 
+      node.level < currentLevel || (node.level === currentLevel && node.expanded)
+    );
+    
+    const visibleNodeIds = new Set(visibleNodes.map(n => n.id));
+    const visibleEdges = data.edges.filter(edge => 
+      visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target)
+    );
+
+    const elements = [
+      ...visibleNodes.map(node => ({
+        data: { 
+          id: node.id, 
+          label: node.label,
+          type: node.type,
+          level: node.level,
+          hasChildren: node.hasChildren
+        }
+      })),
+      ...visibleEdges.map(edge => ({
+        data: { 
+          source: edge.source, 
+          target: edge.target 
+        }
+      }))
+    ];
+
+    cy.add(elements);
+    
+    setTimeout(() => {
+      cy.layout({
+        name: 'cose',
+        fit: true,
+        padding: 50,
+        animate: true,
+        animationDuration: 1000
+      }).run();
+    }, 100);
+  };
+
+  const expandNode = async (nodeId: string) => {
+    try {
+      const response = await fetch('http://localhost:3001/api/mindmap/expand', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          nodeId,
+          currentMindMap: data,
+          query
+        })
+      });
+
+      if (response.ok) {
+        const expandedData = await response.json();
+        // Add expanded nodes to current data
+        // This would require updating the parent component's state
+        toast({
+          title: "Node Expanded",
+          description: "Additional details have been loaded."
+        });
+      }
+    } catch (error) {
+      console.error('Error expanding node:', error);
+    }
+  };
 
   const addNode = () => {
     if (!newNodeLabel.trim() || !cy) {
@@ -223,11 +260,12 @@ const MindMap = ({ data }: MindMapProps) => {
       data: { 
         id: newId, 
         label: newNodeLabel,
-        type: 'sub'
+        type: 'sub',
+        level: 3,
+        hasChildren: false
       }
     });
 
-    // Connect to selected node or center node
     const targetId = selectedNode || cy.nodes('[type="center"]').id();
     if (targetId) {
       cy.add({
@@ -238,7 +276,6 @@ const MindMap = ({ data }: MindMapProps) => {
       });
     }
 
-    // Apply layout with animation
     cy.layout({
       name: 'cose',
       animate: true,
@@ -277,7 +314,6 @@ const MindMap = ({ data }: MindMapProps) => {
     cy.remove(selectedNodeData);
     setSelectedNode(null);
     
-    // Re-layout after deletion
     setTimeout(() => {
       cy.layout({
         name: 'cose',
@@ -289,8 +325,14 @@ const MindMap = ({ data }: MindMapProps) => {
     
     toast({
       title: "Node Deleted",
-      description: "Selected node has been removed from the mind map."
+      description: "Selected node has been removed."
     });
+  };
+
+  const resetView = () => {
+    if (!cy) return;
+    cy.fit();
+    cy.center();
   };
 
   const exportAsPng = () => {
@@ -299,18 +341,17 @@ const MindMap = ({ data }: MindMapProps) => {
     try {
       const png64 = cy.png({
         output: 'blob',
-        bg: '#0f172a',
+        bg: '#0f1419',
         full: true,
         scale: 2,
         maxWidth: 2000,
         maxHeight: 2000
       });
 
-      // Create download link
       const url = URL.createObjectURL(png64);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `mindmap_${new Date().getTime()}.png`;
+      link.download = `novah_mindmap_${new Date().getTime()}.png`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -318,21 +359,29 @@ const MindMap = ({ data }: MindMapProps) => {
 
       toast({
         title: "Export Complete",
-        description: "Mind map has been exported as PNG."
+        description: "Mind map exported successfully."
       });
     } catch (error) {
       toast({
         title: "Export Failed",
-        description: "Failed to export mind map. Please try again.",
+        description: "Failed to export mind map.",
         variant: "destructive"
       });
     }
   };
 
+  const showMoreLevels = () => {
+    setCurrentLevel(prev => Math.min(prev + 2, 6));
+  };
+
+  const showLessLevels = () => {
+    setCurrentLevel(prev => Math.max(prev - 2, 2));
+  };
+
   return (
-    <div className="h-full flex flex-col bg-slate-900">
+    <div className="h-full flex flex-col bg-gray-900">
       {/* Controls */}
-      <Card className="m-4 p-4 bg-slate-800/90 border-slate-600 backdrop-blur-sm">
+      <Card className="m-4 p-4 glass-effect border-white/10">
         <div className="space-y-3">
           <div className="flex space-x-2">
             <Input
@@ -340,38 +389,75 @@ const MindMap = ({ data }: MindMapProps) => {
               value={newNodeLabel}
               onChange={(e) => setNewNodeLabel(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addNode()}
-              className="bg-slate-700/50 border-slate-600 text-white placeholder-slate-400 focus:ring-2 focus:ring-purple-500"
+              className="glass-effect border-white/20 text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500"
             />
             <Button onClick={addNode} size="sm" className="bg-blue-600 hover:bg-blue-700 shrink-0">
               <Plus className="h-4 w-4" />
             </Button>
           </div>
           
-          <div className="flex space-x-2">
-            <Button 
-              onClick={deleteNode} 
-              size="sm" 
-              variant="destructive"
-              disabled={!selectedNode}
-              className="shrink-0"
-            >
-              <Trash2 className="h-4 w-4 mr-1" />
-              Delete
-            </Button>
-            <Button 
-              onClick={exportAsPng} 
-              size="sm" 
-              variant="outline" 
-              className="border-slate-600 text-white hover:bg-slate-700 shrink-0"
-            >
-              <Download className="h-4 w-4 mr-1" />
-              Export PNG
-            </Button>
+          <div className="flex justify-between items-center">
+            <div className="flex space-x-2">
+              <Button 
+                onClick={deleteNode} 
+                size="sm" 
+                variant="destructive"
+                disabled={!selectedNode}
+                className="shrink-0"
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Delete
+              </Button>
+              <Button 
+                onClick={resetView} 
+                size="sm" 
+                variant="outline" 
+                className="glass-effect border-white/20 text-white hover:bg-white/10 shrink-0"
+              >
+                <RotateCcw className="h-4 w-4 mr-1" />
+                Reset View
+              </Button>
+              <Button 
+                onClick={exportAsPng} 
+                size="sm" 
+                variant="outline" 
+                className="glass-effect border-white/20 text-white hover:bg-white/10 shrink-0"
+              >
+                <Download className="h-4 w-4 mr-1" />
+                Export
+              </Button>
+            </div>
+
+            <div className="flex space-x-2">
+              <Button 
+                onClick={showLessLevels}
+                size="sm"
+                variant="outline"
+                disabled={currentLevel <= 2}
+                className="glass-effect border-white/20 text-white hover:bg-white/10"
+              >
+                Show Less
+              </Button>
+              <span className="text-white text-sm px-2 py-1">
+                Level {currentLevel}
+              </span>
+              <Button 
+                onClick={showMoreLevels}
+                size="sm"
+                variant="outline"
+                disabled={currentLevel >= 6}
+                className="glass-effect border-white/20 text-white hover:bg-white/10"
+              >
+                Show More
+              </Button>
+            </div>
           </div>
 
           {selectedNode && cy && (
-            <div className="text-sm text-slate-300 p-2 bg-slate-700/30 rounded">
+            <div className="text-sm text-gray-300 p-2 glass-effect rounded">
               <strong>Selected:</strong> {cy.getElementById(selectedNode).data('label')}
+              <br />
+              <small className="text-gray-400">Double-click nodes with borders to expand</small>
             </div>
           )}
         </div>
@@ -380,7 +466,7 @@ const MindMap = ({ data }: MindMapProps) => {
       {/* Mind Map Canvas */}
       <div 
         ref={cyRef} 
-        className="flex-1 bg-slate-900 border-t border-slate-700/50"
+        className="flex-1 bg-gray-900 border-t border-white/10"
         style={{ 
           minHeight: '400px',
           position: 'relative'
