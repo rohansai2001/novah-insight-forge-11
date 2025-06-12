@@ -20,7 +20,7 @@ interface ThinkingStep {
 
 interface ChatMessage {
   id: string;
-  type: 'user' | 'assistant';
+  type: 'user' | 'ai';
   content: string;
   timestamp: Date;
   sources?: string[];
@@ -35,6 +35,7 @@ const ChatPage = () => {
   const [showThinking, setShowThinking] = useState(true);
   const [mindMapData, setMindMapData] = useState<any>(null);
   const [showMindMap, setShowMindMap] = useState(false);
+  const [followUpQuery, setFollowUpQuery] = useState('');
 
   const { query, files, deepResearch } = location.state || {};
 
@@ -68,7 +69,7 @@ const ChatPage = () => {
       // Add assistant response
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
-        type: 'assistant',
+        type: 'ai',
         content: result.response.content,
         timestamp: new Date(),
         sources: result.response.sources
@@ -79,7 +80,7 @@ const ChatPage = () => {
       console.error('Research processing failed:', error);
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
-        type: 'assistant',
+        type: 'ai',
         content: 'I apologize, but I encountered an error while processing your research request. Please try again.',
         timestamp: new Date()
       };
@@ -89,7 +90,9 @@ const ChatPage = () => {
     }
   };
 
-  const handleFollowUp = async (followUpQuery: string) => {
+  const handleFollowUp = async () => {
+    if (!followUpQuery.trim()) return;
+    
     setIsLoading(true);
     
     const userMessage: ChatMessage = {
@@ -102,7 +105,7 @@ const ChatPage = () => {
 
     try {
       const context = messages
-        .filter(m => m.type === 'assistant')
+        .filter(m => m.type === 'ai')
         .map(m => m.content)
         .join('\n\n');
       
@@ -110,13 +113,14 @@ const ChatPage = () => {
       
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
-        type: 'assistant',
+        type: 'ai',
         content: result.response.content,
         timestamp: new Date(),
         sources: result.response.sources
       };
       
       setMessages(prev => [...prev, assistantMessage]);
+      setFollowUpQuery('');
     } catch (error) {
       console.error('Follow-up processing failed:', error);
     } finally {
@@ -208,11 +212,26 @@ const ChatPage = () => {
             </div>
             
             {/* Chat Input */}
-            <ChatInput
-              onSendMessage={handleFollowUp}
-              isLoading={isLoading}
-              placeholder="Ask a follow-up question or request additional analysis..."
-            />
+            <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-4 backdrop-blur-sm">
+              <div className="flex space-x-3">
+                <input
+                  type="text"
+                  value={followUpQuery}
+                  onChange={(e) => setFollowUpQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && !isLoading && handleFollowUp()}
+                  placeholder="Ask a follow-up question or request additional analysis..."
+                  className="flex-1 bg-slate-900/50 border border-slate-600/50 rounded-md px-4 py-2 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  disabled={isLoading}
+                />
+                <Button
+                  onClick={handleFollowUp}
+                  disabled={isLoading || !followUpQuery.trim()}
+                  className="bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-700 hover:to-purple-700 text-white px-6"
+                >
+                  Send
+                </Button>
+              </div>
+            </div>
           </div>
           
           {/* Mind Map */}
@@ -220,10 +239,7 @@ const ChatPage = () => {
             <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-6 backdrop-blur-sm">
               <h3 className="text-lg font-semibold text-white mb-4">Interactive Knowledge Map</h3>
               <div className="h-96 bg-slate-900/50 rounded border border-slate-600/30">
-                <MindMap 
-                  data={mindMapData}
-                  onNodeExpand={handleMindMapNodeExpand}
-                />
+                <MindMap data={mindMapData} />
               </div>
             </div>
           )}
