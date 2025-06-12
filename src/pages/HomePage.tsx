@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Upload, FileText, Trash2, ArrowRight, Sparkles, Star, Zap, Target } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import AnimatedQuery from '@/components/home/AnimatedQuery';
 
 interface UploadedFile {
   id: string;

@@ -1,9 +1,9 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, Brain, Send, Map, X, Upload, Trash2, FileText, CheckCircle, Loader } from 'lucide-react';
 import MindMap from '@/components/MindMap';
 import { toast } from '@/hooks/use-toast';
@@ -21,9 +21,11 @@ interface ChatMessage {
 }
 
 interface ThinkingStep {
-  step: string;
-  status: 'analyzing' | 'complete' | 'processing';
-  details: string;
+  id: number;
+  type: 'planning' | 'researching' | 'sources' | 'analyzing' | 'replanning' | 'file_processing';
+  title: string;
+  content: string;
+  status: 'processing' | 'complete' | 'pending';
 }
 
 interface UploadedFile {
