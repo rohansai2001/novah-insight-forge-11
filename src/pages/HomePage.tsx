@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -98,30 +99,30 @@ const HomePage = () => {
       title: "Market Analysis",
       prompt: "Analyze current market trends and competitive landscape for",
       icon: <Target className="h-8 w-8" />,
-      gradient: "from-violet-600 via-purple-600 to-pink-600"
+      gradient: "from-emerald-500 via-teal-500 to-cyan-500"
     },
     {
       title: "Technical Research", 
       prompt: "Provide comprehensive technical overview and implementation for",
       icon: <Zap className="h-8 w-8" />,
-      gradient: "from-blue-600 via-cyan-600 to-teal-600"
+      gradient: "from-indigo-500 via-purple-500 to-pink-500"
     },
     {
       title: "Innovation Impact",
       prompt: "Examine industry impact and future implications of",
       icon: <Star className="h-8 w-8" />,
-      gradient: "from-orange-600 via-red-600 to-pink-600"
+      gradient: "from-orange-500 via-red-500 to-rose-500"
     }
   ];
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
-      {/* Animated background */}
+    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-slate-900 via-gray-900 to-slate-800">
+      {/* Animated background particles */}
       <div className="absolute inset-0">
-        {[...Array(60)].map((_, i) => (
+        {[...Array(50)].map((_, i) => (
           <div
             key={i}
-            className="absolute w-1 h-1 bg-purple-400/20 rounded-full animate-float"
+            className="absolute w-1 h-1 bg-blue-400/30 rounded-full animate-float"
             style={{
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
@@ -137,7 +138,7 @@ const HomePage = () => {
           {/* Hero Section */}
           <div className="text-center space-y-8">
             <div className="relative">
-              <h1 className="text-7xl md:text-8xl font-light gradient-text animate-glow mb-6">
+              <h1 className="text-7xl md:text-8xl font-extralight bg-gradient-to-r from-red-500 via-purple-500 to-blue-500 bg-clip-text text-transparent animate-glow mb-6">
                 Novah
               </h1>
               <p className="text-xl md:text-2xl text-gray-300 mb-8 font-light">
@@ -155,14 +156,14 @@ const HomePage = () => {
           </div>
 
           {/* Main Input Card */}
-          <Card className="glass-effect p-8 border-0 shadow-2xl max-w-4xl mx-auto">
+          <Card className="glass-effect p-8 border border-slate-700/50 shadow-2xl max-w-4xl mx-auto backdrop-blur-xl">
             <div className="space-y-6">
               <div className="relative">
                 <Textarea
                   placeholder="Enter your research query..."
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  className="min-h-32 bg-gray-700/30 border border-gray-600/50 text-white placeholder-gray-400 text-lg resize-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 rounded-xl backdrop-blur-sm input-border"
+                  className="min-h-32 bg-slate-800/50 border-2 border-slate-600/50 text-white placeholder-gray-400 text-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-xl backdrop-blur-sm transition-all duration-300"
                   maxLength={1000}
                 />
                 <div className="absolute bottom-3 right-3 text-xs text-gray-500">
@@ -176,7 +177,7 @@ const HomePage = () => {
                     <Switch
                       checked={deepResearch}
                       onCheckedChange={setDeepResearch}
-                      className="data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-purple-500 data-[state=checked]:to-pink-500"
+                      className="data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-blue-500 data-[state=checked]:to-purple-500"
                     />
                     <div className="flex flex-col">
                       <span className="text-white font-medium">
@@ -198,7 +199,7 @@ const HomePage = () => {
                     />
                     <Button 
                       variant="outline" 
-                      className="glass-effect border-gray-600/50 text-white hover:bg-gray-700/50 hover:border-purple-500/50 transition-all duration-300 group-hover:scale-105"
+                      className="glass-effect border-slate-600/50 text-white hover:bg-slate-700/50 hover:border-blue-500/50 transition-all duration-300 group-hover:scale-105 backdrop-blur-sm"
                     >
                       <Upload className="h-4 w-4 mr-2" />
                       Upload Files
@@ -209,7 +210,7 @@ const HomePage = () => {
                 <Button 
                   onClick={handleSubmit}
                   disabled={isLoading}
-                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-3 rounded-xl shadow-lg hover:shadow-purple-500/25 transform hover:scale-105 transition-all duration-300"
+                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-3 rounded-xl shadow-lg hover:shadow-blue-500/25 transform hover:scale-105 transition-all duration-300"
                 >
                   {isLoading ? (
                     <div className="flex items-center">
@@ -230,7 +231,7 @@ const HomePage = () => {
 
           {/* Uploaded Files */}
           {uploadedFiles.length > 0 && (
-            <Card className="glass-effect border-0 p-6 max-w-4xl mx-auto">
+            <Card className="glass-effect border border-slate-700/50 p-6 max-w-4xl mx-auto backdrop-blur-xl">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-white font-medium flex items-center">
                   <FileText className="h-5 w-5 mr-2 text-blue-400" />
@@ -248,7 +249,7 @@ const HomePage = () => {
               </div>
               <div className="space-y-3">
                 {uploadedFiles.map((file) => (
-                  <div key={file.id} className="flex items-center justify-between glass-effect p-4 rounded-lg hover:bg-white/5 transition-colors">
+                  <div key={file.id} className="flex items-center justify-between glass-effect p-4 rounded-lg hover:bg-white/5 transition-colors border border-slate-600/30">
                     <div className="flex items-center space-x-3">
                       <FileText className="h-5 w-5 text-blue-400" />
                       <span className="text-white">{file.name}</span>
@@ -275,21 +276,21 @@ const HomePage = () => {
             {suggestionCards.map((card, index) => (
               <Card
                 key={index}
-                className="cursor-pointer group relative overflow-hidden border-0 hover:scale-105 transition-all duration-500 glass-effect"
+                className="cursor-pointer group relative overflow-hidden border border-slate-700/50 hover:scale-105 transition-all duration-500 glass-effect backdrop-blur-xl"
                 onClick={() => setQuery(card.prompt + " ")}
               >
-                <div className={`absolute inset-0 bg-gradient-to-br ${card.gradient} opacity-5 group-hover:opacity-15 transition-opacity duration-500`}></div>
+                <div className={`absolute inset-0 bg-gradient-to-br ${card.gradient} opacity-10 group-hover:opacity-20 transition-opacity duration-500`}></div>
                 <div className="relative p-6 text-white">
-                  <div className="text-purple-400 mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <div className="text-blue-400 mb-4 group-hover:scale-110 transition-transform duration-300">
                     {card.icon}
                   </div>
-                  <h3 className="font-bold text-xl mb-3 group-hover:text-purple-300 transition-colors">
+                  <h3 className="font-bold text-xl mb-3 group-hover:text-blue-300 transition-colors">
                     {card.title}
                   </h3>
                   <p className="text-gray-300 text-sm leading-relaxed">
                     {card.prompt}...
                   </p>
-                  <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity text-purple-400">
+                  <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity text-blue-400">
                     <ArrowRight className="h-5 w-5" />
                   </div>
                 </div>
