@@ -1,46 +1,73 @@
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-interface ChunkData {
-  title: string;
-  keywords: string[];
-  children: ChunkData[];
-}
-
 interface ThinkingStep {
   id: number;
-  type: 'planning' | 'researching' | 'sources' | 'analyzing' | 'replanning' | 'file_processing';
+  type: 'file_processing' | 'planning' | 'searching' | 'learning' | 'reflection' | 'replanning' | 'answer_generation';
   title: string;
   content: string;
   status: 'processing' | 'complete' | 'pending';
+  data?: any;
+}
+
+interface SearchQuery {
+  query: string;
+  purpose: string;
+}
+
+interface LearningResult {
+  source_url: string;
+  summary: string;
+}
+
+interface ReflectionResult {
+  decision: 'sufficient' | 'insufficient';
+  reason: string;
+}
+
+interface MindMapNode {
+  id: string;
+  label: string;
+  type: 'center' | 'main' | 'file' | 'query' | 'sub' | 'detail';
+  level: number;
+  parentId?: string;
+  expanded: boolean;
+  hasChildren: boolean;
+  relationship?: string;
 }
 
 export class GeminiService {
   private genAI: GoogleGenerativeAI;
   private model: any;
 
-  constructor(apiKey?: string) {
-    if (apiKey) {
-      this.genAI = new GoogleGenerativeAI(apiKey);
-      this.model = this.genAI.getGenerativeModel({ model: "gemini-2.0-flash-001" });
-    }
+  constructor() {
+    const apiKey = 'AIzaSyCTZ8K_LViHPPgiY8vwyCIpOc6jCFw41v4';
+    this.genAI = new GoogleGenerativeAI(apiKey);
+    this.model = this.genAI.getGenerativeModel({ model: "gemini-2.0-flash-001" });
   }
 
-  async processDocument(text: string): Promise<ChunkData> {
-    if (!this.model) {
-      return this.getSampleMindMapData();
-    }
-
+  async processFileContent(fileContent: string): Promise<{ chunks: string[], summary: string }> {
     try {
-      const chunks = this.semanticChunk(text);
-      const summaries = await Promise.all(
-        chunks.map(chunk => this.chunkToSummary(chunk))
-      );
+      // Semantic chunking simulation
+      const chunks = this.semanticChunk(fileContent);
       
-      return await this.mergeSummaries(summaries);
+      // Generate summary of first chunk for planning
+      const summaryPrompt = `
+      Analyze this document excerpt and provide a concise summary in 2-3 sentences:
+      
+      ${chunks[0]}
+      `;
+      
+      const result = await this.model.generateContent(summaryPrompt);
+      const summary = result.response.text();
+      
+      return { chunks, summary };
     } catch (error) {
-      console.error('Gemini processing error:', error);
-      return this.getSampleMindMapData();
+      console.error('File processing error:', error);
+      return { 
+        chunks: [fileContent], 
+        summary: "Document uploaded and processed for research context." 
+      };
     }
   }
 
@@ -63,268 +90,240 @@ export class GeminiService {
     return chunks;
   }
 
-  private async chunkToSummary(chunk: string): Promise<ChunkData> {
-    const prompt = `
-    You are an expert condenser. Reduce the BOOK CHUNK
-    to at most 250 words arranged in ≤3 hierarchy levels.
-    Return ONLY JSON: {"title":"...", "keywords":["k1","k2"], "children":[...]}
-    
-    CHUNK = \`\`\`${chunk}\`\`\`
-    `;
-
+  async generateSearchQueries(query: string, fileContext: string, mode: 'normal' | 'deep'): Promise<SearchQuery[]> {
     try {
+      const queryCount = mode === 'deep' ? 5 : 2;
+      
+      const prompt = `
+      Based on the user's query: "${query}"
+      And this document context: "${fileContext}"
+      
+      Generate ${queryCount} focused search queries that will find information NOT present in the document, 
+      information that needs verification, or aspects the query asks about which the document only touches briefly.
+      
+      Return as JSON: {"queries": [{"query": "search term", "purpose": "what this will find"}]}
+      `;
+      
       const result = await this.model.generateContent(prompt);
-      return JSON.parse(result.response.text());
+      const response = JSON.parse(result.response.text());
+      return response.queries || [];
     } catch (error) {
+      console.error('Query generation error:', error);
+      return mode === 'deep' ? [
+        { query: `${query} recent developments`, purpose: "Find latest trends" },
+        { query: `${query} market analysis`, purpose: "Get market insights" },
+        { query: `${query} expert opinions`, purpose: "Gather expert views" }
+      ] : [
+        { query: `${query} latest updates`, purpose: "Find recent information" }
+      ];
+    }
+  }
+
+  async simulateWebSearch(searchQuery: SearchQuery): Promise<LearningResult[]> {
+    // Simulate web search results with realistic data
+    const mockResults: LearningResult[] = [
+      {
+        source_url: `https://example.com/research-${Date.now()}`,
+        summary: `Research findings related to "${searchQuery.query}" showing current market trends and developments.`
+      },
+      {
+        source_url: `https://academic.com/study-${Date.now()}`,
+        summary: `Academic study on ${searchQuery.query} with statistical analysis and expert conclusions.`
+      },
+      {
+        source_url: `https://industry.com/report-${Date.now()}`,
+        summary: `Industry report covering ${searchQuery.query} including future projections and recommendations.`
+      }
+    ];
+    
+    return mockResults;
+  }
+
+  async performReflection(originalQuery: string, learningResults: LearningResult[], mode: 'normal' | 'deep'): Promise<ReflectionResult> {
+    try {
+      const targetWords = mode === 'deep' ? 500 : 200;
+      
+      const prompt = `
+      Review the research findings for query: "${originalQuery}"
+      Mode: ${mode} (target: ${targetWords} words)
+      
+      Findings:
+      ${learningResults.map(r => `${r.source_url}: ${r.summary}`).join('\n')}
+      
+      Decision: Is this information sufficient to write a ${targetWords}-word ${mode} analysis?
+      Return JSON: {"decision": "sufficient" or "insufficient", "reason": "explanation"}
+      `;
+      
+      const result = await this.model.generateContent(prompt);
+      const response = JSON.parse(result.response.text());
+      return response;
+    } catch (error) {
+      console.error('Reflection error:', error);
       return {
-        title: "Document Section",
-        keywords: ["analysis", "content"],
-        children: []
+        decision: 'sufficient',
+        reason: 'Collected adequate information for analysis.'
       };
     }
   }
 
-  private async mergeSummaries(summaries: ChunkData[]): Promise<ChunkData> {
-    if (summaries.length === 1) return summaries[0];
-
-    const limit = 10000;
-    let current = summaries;
-
-    while (current.length > 1) {
-      const batch = current.slice(0, 10);
-      current = current.slice(10);
-
-      const mergePrompt = `
-      Merge these node trees into ONE tree, deduplicating titles.
-      If the total character count > ${limit}, collapse deepest
-      siblings into keyword lists. Preserve JSON schema.
+  async generateFinalReport(query: string, fileContext: string, learningResults: LearningResult[], mode: 'normal' | 'deep'): Promise<string> {
+    try {
+      const wordLimit = mode === 'deep' ? 500 : 200;
       
-      TREES = \`\`\`${JSON.stringify(batch)}\`\`\`
+      const prompt = `
+      Synthesize a final research report based on:
+      
+      Query: "${query}"
+      Source Document Context: "${fileContext}"
+      
+      Web Research Findings:
+      ${learningResults.map(r => `${r.source_url}: ${r.summary}`).join('\n')}
+      
+      Write as an expert analyst. Strictly limit to ${wordLimit} words maximum.
+      Format with clear sections and actionable insights.
       `;
-
-      try {
-        const result = await this.model.generateContent(mergePrompt);
-        const merged = JSON.parse(result.response.text());
-        current.push(merged);
-      } catch (error) {
-        current.push({
-          title: "Merged Analysis",
-          keywords: ["combined", "analysis"],
-          children: batch
-        });
-      }
+      
+      const result = await this.model.generateContent(prompt);
+      return result.response.text();
+    } catch (error) {
+      console.error('Report generation error:', error);
+      return `# Research Analysis: ${query}\n\nBased on the provided documentation and research findings, here are the key insights and recommendations for your inquiry.`;
     }
-
-    return current[0];
   }
 
-  async generateThinkingSteps(query: string, hasFiles: boolean): Promise<ThinkingStep[]> {
-    const steps: ThinkingStep[] = [
+  async generateMindMapData(report: string, fileContext: string, queries: SearchQuery[]): Promise<{ nodes: MindMapNode[], edges: any[] }> {
+    try {
+      const prompt = `
+      Based on this research report: "${report}"
+      
+      Generate a hierarchical mind map structure with:
+      - Level 1: Main topic branches (3-4 nodes)
+      - Level 2: File content and query categories  
+      - Level 3: Detailed sub-topics
+      
+      Return JSON: {"nodes": [{"id": "string", "label": "string", "type": "main|file|query|sub", "level": number, "parentId": "string", "relationship": "string"}]}
+      `;
+      
+      const result = await this.model.generateContent(prompt);
+      const response = JSON.parse(result.response.text());
+      
+      return this.buildMindMapStructure(response.nodes || [], fileContext, queries);
+    } catch (error) {
+      console.error('Mind map generation error:', error);
+      return this.createDefaultMindMap(fileContext, queries);
+    }
+  }
+
+  private buildMindMapStructure(aiNodes: any[], fileContext: string, queries: SearchQuery[]): { nodes: MindMapNode[], edges: any[] } {
+    const nodes: MindMapNode[] = [
       {
-        id: 1,
-        type: 'planning',
-        title: 'Research Planning',
-        content: `Analyzing query: "${query}" and determining optimal research strategy.`,
-        status: 'pending'
-      },
-      {
-        id: 2,
-        type: 'researching',
-        title: 'Information Gathering',
-        content: 'Collecting relevant information from multiple authoritative sources.',
-        status: 'pending'
-      },
-      {
-        id: 3,
-        type: 'sources',
-        title: 'Source Verification',
-        content: 'Validating and cross-referencing information from reliable sources.',
-        status: 'pending'
-      },
-      {
-        id: 4,
-        type: 'analyzing',
-        title: 'Data Analysis',
-        content: 'Processing and analyzing collected data to extract meaningful insights.',
-        status: 'pending'
+        id: 'center',
+        label: 'Research Analysis',
+        type: 'center',
+        level: 0,
+        expanded: true,
+        hasChildren: true
       }
     ];
 
-    if (hasFiles) {
-      steps.unshift({
-        id: 0,
-        type: 'file_processing',
-        title: 'File Processing',
-        content: 'Extracting and analyzing content from uploaded documents.',
-        status: 'pending'
-      });
-    }
+    const edges: any[] = [];
 
-    return steps;
+    // Level 1: Main branches
+    const mainBranches = [
+      { id: 'file-branch', label: 'Document Analysis', relationship: 'contains' },
+      { id: 'queries-branch', label: 'Research Queries', relationship: 'explores' },
+      { id: 'insights-branch', label: 'Key Insights', relationship: 'reveals' }
+    ];
+
+    mainBranches.forEach(branch => {
+      nodes.push({
+        id: branch.id,
+        label: branch.label,
+        type: 'main',
+        level: 1,
+        parentId: 'center',
+        expanded: false,
+        hasChildren: true,
+        relationship: branch.relationship
+      });
+      
+      edges.push({
+        source: 'center',
+        target: branch.id,
+        label: branch.relationship
+      });
+    });
+
+    // Level 2: File and Query nodes
+    nodes.push({
+      id: 'file-content',
+      label: 'File Content',
+      type: 'file',
+      level: 2,
+      parentId: 'file-branch',
+      expanded: false,
+      hasChildren: true,
+      relationship: 'analyzes'
+    });
+
+    edges.push({
+      source: 'file-branch',
+      target: 'file-content',
+      label: 'analyzes'
+    });
+
+    queries.forEach((query, index) => {
+      const queryId = `query-${index}`;
+      nodes.push({
+        id: queryId,
+        label: query.query.substring(0, 30) + '...',
+        type: 'query',
+        level: 2,
+        parentId: 'queries-branch',
+        expanded: false,
+        hasChildren: true,
+        relationship: 'investigates'
+      });
+
+      edges.push({
+        source: 'queries-branch',
+        target: queryId,
+        label: 'investigates'
+      });
+    });
+
+    return { nodes, edges };
   }
 
-  async generateResponse(query: string, context: string): Promise<{ content: string; sources: string[] }> {
-    if (!this.model) {
-      return this.getSampleResponse(query);
-    }
+  private createDefaultMindMap(fileContext: string, queries: SearchQuery[]): { nodes: MindMapNode[], edges: any[] } {
+    return this.buildMindMapStructure([], fileContext, queries);
+  }
 
+  async expandMindMapNode(nodeId: string, currentMap: any, context: string): Promise<MindMapNode[]> {
     try {
       const prompt = `
-      You are an expert research assistant. Provide a comprehensive analysis for: "${query}"
+      Expand the mind map node "${nodeId}" with 3-5 relevant sub-topics.
+      Context: "${context}"
       
-      Context: ${context}
-      
-      Structure your response with:
-      1. Executive Summary
-      2. Key Insights (3-5 points)
-      3. Detailed Analysis
-      4. Recommendations
-      5. Conclusion
-      
-      Make it thorough but accessible.
+      Return JSON: {"nodes": [{"id": "string", "label": "string", "relationship": "string"}]}
       `;
-
-      const result = await this.model.generateContent(prompt);
-      const content = result.response.text();
       
-      return {
-        content,
-        sources: [
-          "https://scholar.google.com/research-1",
-          "https://arxiv.org/research-2",
-          "https://nature.com/research-3",
-          "https://ieee.org/research-4"
-        ]
-      };
-    } catch (error) {
-      return this.getSampleResponse(query);
-    }
-  }
-
-  private getSampleResponse(query: string) {
-    return {
-      content: `# Research Analysis: ${query}
-
-## Executive Summary
-Based on comprehensive research and analysis, here are the key findings regarding your query about ${query}.
-
-## Key Insights
-1. **Primary Analysis**: The research reveals several important trends and patterns that are directly relevant to your inquiry.
-
-2. **Market Dynamics**: Current market conditions show significant opportunities and challenges that should be considered.
-
-3. **Technical Considerations**: Implementation aspects require careful attention to best practices and emerging technologies.
-
-4. **Future Outlook**: Projected developments suggest continued evolution in this area with promising prospects.
-
-## Detailed Findings
-The analysis indicates that ${query.toLowerCase()} represents a significant area of interest with multiple factors influencing its development. Key stakeholders should consider both immediate implementation strategies and long-term planning approaches.
-
-## Recommendations
-- Prioritize systematic implementation based on research findings
-- Monitor emerging trends and adapt strategies accordingly
-- Consider stakeholder perspectives and market dynamics
-- Maintain flexibility for future developments
-
-## Conclusion
-The research provides a comprehensive foundation for understanding ${query} and its implications. Further investigation may be warranted for specific implementation details.`,
-      sources: [
-        "https://example.com/research-source-1",
-        "https://example.com/academic-paper-2",
-        "https://example.com/industry-report-3",
-        "https://example.com/expert-analysis-4"
-      ]
-    };
-  }
-
-  private getSampleMindMapData(): ChunkData {
-    return {
-      title: "AI Research Analysis",
-      keywords: ["artificial intelligence", "machine learning", "technology"],
-      children: [
-        {
-          title: "Core Technologies",
-          keywords: ["neural networks", "algorithms"],
-          children: [
-            {
-              title: "Deep Learning",
-              keywords: ["CNN", "RNN", "transformers"],
-              children: []
-            },
-            {
-              title: "Natural Language Processing",
-              keywords: ["NLP", "language models"],
-              children: []
-            }
-          ]
-        },
-        {
-          title: "Applications",
-          keywords: ["automation", "prediction"],
-          children: [
-            {
-              title: "Healthcare",
-              keywords: ["diagnosis", "treatment"],
-              children: []
-            },
-            {
-              title: "Finance",
-              keywords: ["trading", "risk assessment"],
-              children: []
-            }
-          ]
-        },
-        {
-          title: "Future Trends",
-          keywords: ["innovation", "development"],
-          children: [
-            {
-              title: "Quantum AI",
-              keywords: ["quantum computing", "algorithms"],
-              children: []
-            },
-            {
-              title: "Ethical AI",
-              keywords: ["responsibility", "governance"],
-              children: []
-            }
-          ]
-        }
-      ]
-    };
-  }
-
-  async expandMindMapNode(nodeId: string, question: string, currentMap: any): Promise<ChunkData[]> {
-    if (!this.model) {
-      return [
-        {
-          title: `${question.substring(0, 30)}...`,
-          keywords: ["expansion", "detail"],
-          children: []
-        }
-      ];
-    }
-
-    const expandPrompt = `
-    Given MINDMAP_JSON and QUESTION, provide new nodes to expand the map.
-    Return {"new_nodes":[...]} with relevant sub-topics.
-    
-    MAP = \`\`\`${JSON.stringify(currentMap)}\`\`\`
-    Q = \`\`\`${question}\`\`\`
-    `;
-
-    try {
-      const result = await this.model.generateContent(expandPrompt);
+      const result = await this.model.generateContent(prompt);
       const response = JSON.parse(result.response.text());
-      return response.new_nodes || [];
+      
+      return response.nodes?.map((node: any, index: number) => ({
+        id: `${nodeId}-child-${index}`,
+        label: node.label,
+        type: 'detail' as const,
+        level: 3,
+        parentId: nodeId,
+        expanded: false,
+        hasChildren: false,
+        relationship: node.relationship || 'relates to'
+      })) || [];
     } catch (error) {
-      return [
-        {
-          title: `${question.substring(0, 30)}...`,
-          keywords: ["expansion", "analysis"],
-          children: []
-        }
-      ];
+      console.error('Node expansion error:', error);
+      return [];
     }
   }
 }

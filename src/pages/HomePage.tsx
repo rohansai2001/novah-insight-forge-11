@@ -115,24 +115,27 @@ const HomePage = () => {
           {/* Hero Section */}
           <div className="text-center space-y-8">
             <div className="relative">
-              <h1 className="text-7xl md:text-8xl font-extralight bg-gradient-to-r from-red-500 via-purple-500 via-blue-500 to-cyan-500 bg-clip-text text-transparent animate-glow mb-6">
+              <h1 className="text-7xl md:text-8xl font-light bg-gradient-to-r from-red-500 via-purple-500 via-blue-500 to-cyan-500 bg-clip-text text-transparent animate-glow mb-6">
                 Novah
               </h1>
               <p className="text-xl md:text-2xl text-slate-300 mb-8 font-light">
-                Advanced AI Research Assistant
+                Transparent AI Research Co-Pilot
+              </p>
+              <p className="text-sm text-slate-400 max-w-2xl mx-auto">
+                Upload your documents, ask your questions, and watch the AI research process unfold in real-time
               </p>
             </div>
           </div>
 
           {/* Main Input Card */}
-          <Card className="bg-slate-800/40 border border-slate-700/50 backdrop-blur-sm p-8 shadow-2xl max-w-4xl mx-auto">
+          <Card className="bg-slate-800/40 border-2 border-slate-600/50 backdrop-blur-sm p-8 shadow-2xl max-w-4xl mx-auto hover:border-cyan-500/30 transition-all duration-300">
             <div className="space-y-6">
               <div className="relative">
                 <Textarea
                   placeholder="Enter your research query..."
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  className="min-h-32 bg-slate-700/30 border-2 border-slate-600/50 text-white placeholder-slate-400 text-lg resize-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 rounded-xl backdrop-blur-sm"
+                  className="min-h-32 bg-slate-700/50 border-2 border-slate-600/70 text-white placeholder-slate-400 text-lg resize-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 rounded-xl backdrop-blur-sm transition-all duration-300"
                   maxLength={1000}
                 />
                 <div className="absolute bottom-3 right-3 text-xs text-slate-500">
@@ -150,10 +153,10 @@ const HomePage = () => {
                     />
                     <div className="flex flex-col">
                       <span className="text-white font-medium">
-                        {deepResearch ? 'Deep Research' : 'Quick Research'}
+                        {deepResearch ? 'Deep Research' : 'Normal Research'}
                       </span>
                       <span className="text-xs text-slate-400">
-                        {deepResearch ? 'Comprehensive analysis' : 'Fast insights'}
+                        {deepResearch ? '500 words, 5 queries' : '200 words, 2 queries'}
                       </span>
                     </div>
                   </div>
@@ -168,10 +171,10 @@ const HomePage = () => {
                     />
                     <Button 
                       variant="outline" 
-                      className="bg-slate-700/30 border-2 border-slate-600/50 text-white hover:bg-slate-700/50 hover:border-cyan-500/50 transition-all duration-300 group-hover:scale-105"
+                      className="bg-slate-700/50 border-2 border-slate-600/70 text-white hover:bg-slate-700/70 hover:border-cyan-500/50 transition-all duration-300 group-hover:scale-105"
                     >
                       <Upload className="h-4 w-4 mr-2" />
-                      Upload Files
+                      Upload Context Files
                     </Button>
                   </label>
                 </div>
@@ -184,12 +187,12 @@ const HomePage = () => {
                   {isLoading ? (
                     <div className="flex items-center">
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                      Processing...
+                      Initiating Research...
                     </div>
                   ) : (
                     <>
                       <Sparkles className="h-4 w-4 mr-2" />
-                      Start Research
+                      Start Deep Research
                       <ArrowRight className="h-4 w-4 ml-2" />
                     </>
                   )}

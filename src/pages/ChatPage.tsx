@@ -1,348 +1,233 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Map, X } from 'lucide-react';
-import MindMap from '@/components/MindMap';
-import { toast } from '@/hooks/use-toast';
-import ThinkingProcess from '@/components/chat/ThinkingProcess';
-import StreamingText from '@/components/chat/StreamingText';
+import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { aiService } from '@/services/aiService';
+import ThinkingStream from '@/components/chat/ThinkingStream';
 import MessageBubble from '@/components/chat/MessageBubble';
 import ChatInput from '@/components/chat/ChatInput';
-import { aiService } from '@/services/aiService';
-
-interface ChatMessage {
-  id: string;
-  type: 'user' | 'ai';
-  content: string;
-  files?: any[];
-  thinking?: ThinkingStep[];
-  sources?: string[];
-  timestamp: Date;
-}
+import MindMap from '@/components/MindMap';
 
 interface ThinkingStep {
   id: number;
-  type: 'planning' | 'researching' | 'sources' | 'analyzing' | 'replanning' | 'file_processing';
+  type: 'file_processing' | 'planning' | 'searching' | 'learning' | 'reflection' | 'replanning' | 'answer_generation';
   title: string;
   content: string;
   status: 'processing' | 'complete' | 'pending';
+  data?: any;
 }
 
-interface UploadedFile {
+interface ChatMessage {
   id: string;
-  name: string;
+  type: 'user' | 'assistant';
   content: string;
-  type: string;
-  file: File;
+  timestamp: Date;
+  sources?: string[];
 }
 
 const ChatPage = () => {
-  const navigate = useNavigate();
   const location = useLocation();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
+  const [thinkingSteps, setThinkingSteps] = useState<ThinkingStep[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [newMessage, setNewMessage] = useState('');
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [currentThinking, setCurrentThinking] = useState<ThinkingStep[]>([]);
-  const [showMindMap, setShowMindMap] = useState(false);
+  const [showThinking, setShowThinking] = useState(true);
   const [mindMapData, setMindMapData] = useState<any>(null);
-  const [streamingContent, setStreamingContent] = useState('');
-  const [originalQuery, setOriginalQuery] = useState('');
+  const [showMindMap, setShowMindMap] = useState(false);
+
+  const { query, files, deepResearch } = location.state || {};
 
   useEffect(() => {
-    if (location.state) {
-      const { query, files, deepResearch } = location.state;
-      setOriginalQuery(query);
-      handleInitialQuery(query, files, deepResearch);
+    if (!query) {
+      navigate('/');
+      return;
     }
-  }, [location.state]);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, streamingContent]);
+    processInitialQuery();
+  }, [query, files, deepResearch]);
 
-  const handleInitialQuery = async (query: string, files: any[], deepResearch: boolean) => {
+  const processInitialQuery = async () => {
+    setIsLoading(true);
+    
+    // Add user message
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       type: 'user',
       content: query,
-      files,
       timestamp: new Date()
     };
-
     setMessages([userMessage]);
-    await processResearchQuery(query, files, deepResearch);
-  };
-
-  const processResearchQuery = async (query: string, files: any[], deepResearch: boolean) => {
-    setIsProcessing(true);
-    setStreamingContent('');
 
     try {
-      console.log('Starting research process for:', query);
+      const result = await aiService.processResearch(query, files || [], deepResearch);
       
-      const data = await aiService.processResearch(query, files, deepResearch);
+      setThinkingSteps(result.thinkingSteps);
+      setMindMapData(result.mindMap);
       
-      setCurrentThinking(data.thinkingSteps);
-      
-      for (let i = 0; i < data.thinkingSteps.length; i++) {
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        setCurrentThinking(prev => 
-          prev.map((step, index) => 
-            index <= i ? { ...step, status: 'complete' } : step
-          )
-        );
-      }
-
-      setStreamingContent(data.response.content);
-      
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      const aiMessage: ChatMessage = {
+      // Add assistant response
+      const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
-        type: 'ai',
-        content: data.response.content,
-        thinking: data.thinkingSteps,
-        sources: data.response.sources,
+        type: 'assistant',
+        content: result.response.content,
+        timestamp: new Date(),
+        sources: result.response.sources
+      };
+      
+      setMessages(prev => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error('Research processing failed:', error);
+      const errorMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        type: 'assistant',
+        content: 'I apologize, but I encountered an error while processing your research request. Please try again.',
         timestamp: new Date()
       };
-
-      setMessages(prev => [...prev, aiMessage]);
-      setMindMapData(data.mindMap);
-      setCurrentThinking([]);
-
-      console.log('Research process completed successfully');
-
-    } catch (error) {
-      console.error('Error processing research:', error);
-      toast({
-        title: "Error",
-        description: "Failed to process research query. Please try again.",
-        variant: "destructive"
-      });
+      setMessages(prev => [...prev, errorMessage]);
     } finally {
-      setIsProcessing(false);
-      setStreamingContent('');
+      setIsLoading(false);
     }
   };
 
-  const handleSendMessage = async () => {
-    if (!newMessage.trim() && uploadedFiles.length === 0) return;
-
+  const handleFollowUp = async (followUpQuery: string) => {
+    setIsLoading(true);
+    
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       type: 'user',
-      content: newMessage,
-      files: uploadedFiles.length > 0 ? uploadedFiles : undefined,
+      content: followUpQuery,
       timestamp: new Date()
     };
-
     setMessages(prev => [...prev, userMessage]);
-    setIsProcessing(true);
-    
+
     try {
-      console.log('Processing follow-up question:', newMessage);
+      const context = messages
+        .filter(m => m.type === 'assistant')
+        .map(m => m.content)
+        .join('\n\n');
       
-      const data = await aiService.processFollowUp(
-        newMessage,
-        messages.map(m => m.content).join('\n'),
-        uploadedFiles
-      );
+      const result = await aiService.processFollowUp(followUpQuery, context, files || []);
       
-      setCurrentThinking(data.thinkingSteps);
-      
-      for (let i = 0; i < data.thinkingSteps.length; i++) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        setCurrentThinking(prev => 
-          prev.map((step, index) => 
-            index <= i ? { ...step, status: 'complete' } : step
-          )
-        );
-      }
-      
-      const aiMessage: ChatMessage = {
+      const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
-        type: 'ai',
-        content: data.response.content,
-        thinking: data.thinkingSteps,
-        sources: data.response.sources,
-        timestamp: new Date()
+        type: 'assistant',
+        content: result.response.content,
+        timestamp: new Date(),
+        sources: result.response.sources
       };
-
-      setMessages(prev => [...prev, aiMessage]);
-      setCurrentThinking([]);
       
-      if (mindMapData && newMessage.length > 10) {
-        const newNodeId = `followup_${Date.now()}`;
-        const newNode = {
-          id: newNodeId,
-          label: newMessage.substring(0, 20) + '...',
-          type: 'sub',
-          level: 2,
-          parentId: 'center',
-          expanded: false,
-          hasChildren: false
-        };
-        
-        setMindMapData(prev => ({
-          nodes: [...prev.nodes, newNode],
-          edges: [...prev.edges, { source: 'center', target: newNodeId }]
-        }));
-      }
-
-      console.log('Follow-up processed successfully');
-
+      setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
-      console.error('Error sending follow-up:', error);
-      toast({
-        title: "Error",
-        description: "Failed to send message. Please try again.",
-        variant: "destructive"
-      });
+      console.error('Follow-up processing failed:', error);
     } finally {
-      setIsProcessing(false);
+      setIsLoading(false);
     }
-
-    setNewMessage('');
-    setUploadedFiles([]);
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files) return;
-
-    Array.from(files).forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const newFile: UploadedFile = {
-          id: Math.random().toString(36).substr(2, 9),
-          name: file.name,
-          content: e.target?.result as string,
-          type: '.' + file.name.split('.').pop()?.toLowerCase(),
-          file: file
-        };
-        setUploadedFiles(prev => [...prev, newFile]);
-        toast({
-          title: "File Uploaded",
-          description: `${file.name} has been uploaded successfully.`,
-        });
-      };
-      reader.readAsText(file);
-    });
-
-    event.target.value = '';
-  };
-
-  const generateMindMap = () => {
-    if (!mindMapData) {
-      toast({
-        title: "No Data",
-        description: "Complete a research query first to generate mind map.",
-        variant: "destructive"
-      });
-      return;
+  const handleMindMapNodeExpand = async (nodeId: string) => {
+    try {
+      const expandedMap = await aiService.expandMindMapNode(nodeId, mindMapData, query);
+      setMindMapData(expandedMap);
+    } catch (error) {
+      console.error('Mind map expansion failed:', error);
     }
-    setShowMindMap(true);
   };
 
   return (
-    <div className="min-h-screen relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Header */}
-      <div className="sticky top-0 z-40 bg-slate-800/40 border-b border-slate-700/50 backdrop-blur-sm p-4">
-        <div className="flex items-center justify-between max-w-7xl mx-auto">
-          <h1 
-            className="text-3xl font-extralight bg-gradient-to-r from-red-500 via-purple-500 via-blue-500 to-cyan-500 bg-clip-text text-transparent cursor-pointer hover:scale-105 transition-transform"
-            onClick={() => navigate('/')}
-          >
-            Novah
-          </h1>
-          
-          <div className="flex items-center space-x-4">
-            {mindMapData && !showMindMap && (
+      <div className="border-b border-slate-700/50 bg-slate-800/40 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
               <Button
-                onClick={generateMindMap}
-                className="bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-700 hover:to-cyan-700 text-white"
+                variant="ghost"
+                onClick={() => navigate('/')}
+                className="text-slate-300 hover:text-white"
               >
-                <Map className="h-4 w-4 mr-2" />
-                View Mind Map
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Home
               </Button>
-            )}
-            {showMindMap && (
+              <div className="h-6 w-px bg-slate-600"></div>
+              <h1 className="text-xl font-semibold text-white">Deep Research Session</h1>
+            </div>
+            
+            <div className="flex items-center space-x-3">
               <Button
                 variant="outline"
-                onClick={() => setShowMindMap(false)}
-                className="bg-slate-700/30 border border-slate-600/50 text-white hover:bg-slate-700/50"
+                onClick={() => setShowThinking(!showThinking)}
+                className="bg-slate-700/50 border-slate-600 text-white hover:bg-slate-700"
               >
-                <X className="h-4 w-4 mr-2" />
-                Hide Mind Map
+                {showThinking ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+                {showThinking ? 'Hide Thinking' : 'Show Thinking'}
               </Button>
-            )}
+              
+              {mindMapData && (
+                <Button
+                  variant="outline"
+                  onClick={() => setShowMindMap(!showMindMap)}
+                  className="bg-slate-700/50 border-slate-600 text-white hover:bg-slate-700"
+                >
+                  {showMindMap ? 'Hide Mind Map' : 'View Mind Map'}
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="flex h-[calc(100vh-80px)] relative">
-        {/* Chat Area */}
-        <div className={`chat-container ${showMindMap ? 'w-1/2' : 'w-full'} flex flex-col`}>
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-7xl mx-auto px-6 py-6">
+        <div className={`grid gap-6 transition-all duration-500 ${
+          showMindMap ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'
+        }`}>
+          {/* Main Chat Area */}
+          <div className="space-y-6">
+            {/* Thinking Process */}
+            <ThinkingStream 
+              steps={thinkingSteps} 
+              isVisible={showThinking}
+            />
+            
+            {/* Chat Messages */}
+            <div className="space-y-4">
               {messages.map((message) => (
-                <MessageBubble key={message.id} message={message} />
+                <MessageBubble
+                  key={message.id}
+                  message={message}
+                />
               ))}
-
-              {isProcessing && (
-                <div className="flex justify-start">
-                  <div className="max-w-3xl">
-                    <ThinkingProcess steps={currentThinking} isVisible={true} />
-                    {streamingContent && (
-                      <div className="bg-slate-800/50 text-white border border-slate-700/50 backdrop-blur-sm rounded-lg mt-4 p-6">
-                        <StreamingText content={streamingContent} />
-                      </div>
-                    )}
+              
+              {isLoading && (
+                <div className="flex items-center justify-center py-8">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-6 h-6 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-slate-300">Processing your request...</span>
                   </div>
                 </div>
               )}
-
-              <div ref={messagesEndRef} />
             </div>
+            
+            {/* Chat Input */}
+            <ChatInput
+              onSendMessage={handleFollowUp}
+              isLoading={isLoading}
+              placeholder="Ask a follow-up question or request additional analysis..."
+            />
           </div>
-
-          {/* Chat Input */}
-          <ChatInput
-            message={newMessage}
-            onMessageChange={setNewMessage}
-            onSendMessage={handleSendMessage}
-            onFileUpload={handleFileUpload}
-            uploadedFiles={uploadedFiles}
-            onRemoveFile={(id) => setUploadedFiles(prev => prev.filter(f => f.id !== id))}
-            isProcessing={isProcessing}
-          />
+          
+          {/* Mind Map */}
+          {showMindMap && mindMapData && (
+            <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-6 backdrop-blur-sm">
+              <h3 className="text-lg font-semibold text-white mb-4">Interactive Knowledge Map</h3>
+              <div className="h-96 bg-slate-900/50 rounded border border-slate-600/30">
+                <MindMap 
+                  data={mindMapData}
+                  onNodeExpand={handleMindMapNodeExpand}
+                />
+              </div>
+            </div>
+          )}
         </div>
-
-        {/* Mind Map */}
-        {showMindMap && (
-          <div className="mind-map-container w-1/2 border-l border-slate-700/50">
-            <div className="h-full flex flex-col bg-slate-800/50">
-              <div className="p-4 border-b border-slate-700/50 flex items-center justify-between">
-                <h3 className="text-white font-medium">Research Mind Map</h3>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowMindMap(false)}
-                  className="text-slate-400 hover:text-white"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="flex-1">
-                <MindMap data={mindMapData} query={originalQuery} />
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
