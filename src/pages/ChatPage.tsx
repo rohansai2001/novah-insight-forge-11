@@ -9,6 +9,7 @@ import MindMap from '@/components/MindMap';
 import { toast } from '@/hooks/use-toast';
 import ThinkingProcess from '@/components/chat/ThinkingProcess';
 import StreamingText from '@/components/chat/StreamingText';
+import { aiService } from '@/services/aiService';
 
 interface ChatMessage {
   id: string;
@@ -33,6 +34,7 @@ interface UploadedFile {
   name: string;
   content: string;
   type: string;
+  file: File;
 }
 
 const ChatPage = () => {
@@ -79,33 +81,16 @@ const ChatPage = () => {
     setStreamingContent('');
 
     try {
-      const formData = new FormData();
-      formData.append('query', query);
-      formData.append('deepResearch', deepResearch.toString());
+      console.log('Starting research process for:', query);
       
-      files.forEach((file: any) => {
-        if (file instanceof File) {
-          formData.append('files', file);
-        }
-      });
-
-      const response = await fetch('http://localhost:3001/api/research', {
-        method: 'POST',
-        body: formData
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to get research response');
-      }
-
-      const data = await response.json();
+      const data = await aiService.processResearch(query, files, deepResearch);
       
       // Set thinking steps
       setCurrentThinking(data.thinkingSteps);
       
       // Simulate step-by-step completion
       for (let i = 0; i < data.thinkingSteps.length; i++) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 1500));
         setCurrentThinking(prev => 
           prev.map((step, index) => 
             index <= i ? { ...step, status: 'complete' } : step
@@ -115,6 +100,9 @@ const ChatPage = () => {
 
       // Start streaming response
       setStreamingContent(data.response.content);
+      
+      // Wait a bit for streaming effect
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
       const aiMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -128,6 +116,8 @@ const ChatPage = () => {
       setMessages(prev => [...prev, aiMessage]);
       setMindMapData(data.mindMap);
       setCurrentThinking([]);
+
+      console.log('Research process completed successfully');
 
     } catch (error) {
       console.error('Error processing research:', error);
@@ -154,36 +144,41 @@ const ChatPage = () => {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    setIsProcessing(true);
     
     try {
-      const response = await fetch('http://localhost:3001/api/followup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          query: newMessage,
-          context: messages.map(m => m.content).join('\n'),
-          files: uploadedFiles
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to get follow-up response');
+      console.log('Processing follow-up question:', newMessage);
+      
+      const data = await aiService.processFollowUp(
+        newMessage,
+        messages.map(m => m.content).join('\n'),
+        uploadedFiles
+      );
+      
+      // Set thinking steps
+      setCurrentThinking(data.thinkingSteps);
+      
+      // Simulate step-by-step completion
+      for (let i = 0; i < data.thinkingSteps.length; i++) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setCurrentThinking(prev => 
+          prev.map((step, index) => 
+            index <= i ? { ...step, status: 'complete' } : step
+          )
+        );
       }
-
-      const data = await response.json();
       
       const aiMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         type: 'ai',
         content: data.response.content,
-        thinking: data.response.thinkingSteps,
+        thinking: data.thinkingSteps,
         sources: data.response.sources,
         timestamp: new Date()
       };
 
       setMessages(prev => [...prev, aiMessage]);
+      setCurrentThinking([]);
       
       // Add new node to mind map if relevant
       if (mindMapData && newMessage.length > 10) {
@@ -204,6 +199,8 @@ const ChatPage = () => {
         }));
       }
 
+      console.log('Follow-up processed successfully');
+
     } catch (error) {
       console.error('Error sending follow-up:', error);
       toast({
@@ -211,6 +208,8 @@ const ChatPage = () => {
         description: "Failed to send message. Please try again.",
         variant: "destructive"
       });
+    } finally {
+      setIsProcessing(false);
     }
 
     setNewMessage('');
@@ -228,12 +227,20 @@ const ChatPage = () => {
           id: Math.random().toString(36).substr(2, 9),
           name: file.name,
           content: e.target?.result as string,
-          type: '.' + file.name.split('.').pop()?.toLowerCase()
+          type: '.' + file.name.split('.').pop()?.toLowerCase(),
+          file: file
         };
         setUploadedFiles(prev => [...prev, newFile]);
+        toast({
+          title: "File Uploaded",
+          description: `${file.name} has been uploaded successfully.`,
+        });
       };
       reader.readAsText(file);
     });
+
+    // Reset input
+    event.target.value = '';
   };
 
   const generateMindMap = () => {
@@ -254,7 +261,7 @@ const ChatPage = () => {
       <div className="sticky top-0 z-40 glass-effect border-b border-gray-700/50 p-4">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <h1 
-            className="text-3xl font-light gradient-text cursor-pointer hover:scale-105 transition-transform"
+            className="text-3xl font-light bg-gradient-to-r from-red-500 via-purple-500 to-blue-500 bg-clip-text text-transparent cursor-pointer hover:scale-105 transition-transform"
             onClick={() => navigate('/')}
           >
             Novah
@@ -394,7 +401,8 @@ const ChatPage = () => {
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-                  className="flex-1 bg-gray-700/30 border border-gray-600/50 text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 input-border"
+                  className="flex-1 bg-gray-700/30 border border-gray-600/50 text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  disabled={isProcessing}
                 />
 
                 <label className="cursor-pointer">
@@ -405,14 +413,18 @@ const ChatPage = () => {
                     onChange={handleFileUpload}
                     className="hidden"
                   />
-                  <Button variant="outline" className="glass-effect border-gray-600/50 text-white hover:bg-gray-700/50">
+                  <Button 
+                    variant="outline" 
+                    className="glass-effect border-gray-600/50 text-white hover:bg-gray-700/50"
+                    disabled={isProcessing}
+                  >
                     <Upload className="h-4 w-4" />
                   </Button>
                 </label>
 
                 <Button 
                   onClick={handleSendMessage}
-                  disabled={!newMessage.trim() && uploadedFiles.length === 0}
+                  disabled={(!newMessage.trim() && uploadedFiles.length === 0) || isProcessing}
                   className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
                 >
                   <Send className="h-4 w-4" />

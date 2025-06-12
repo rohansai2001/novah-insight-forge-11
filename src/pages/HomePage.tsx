@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ interface UploadedFile {
   name: string;
   content: string;
   type: string;
+  file: File;
 }
 
 const HomePage = () => {
@@ -23,10 +25,10 @@ const HomePage = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const animatedQueries = [
-    "Analyze market trends in renewable energy sector...",
-    "Research the impact of AI on healthcare innovation...",
-    "Explore blockchain applications in supply chain...",
-    "Investigate quantum computing breakthrough potential..."
+    "Analyze market trends in renewable energy sector",
+    "Research the impact of AI on healthcare innovation",
+    "Explore blockchain applications in supply chain",
+    "Investigate quantum computing breakthrough potential"
   ];
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -61,16 +63,28 @@ const HomePage = () => {
           id: Math.random().toString(36).substr(2, 9),
           name: file.name,
           content: e.target?.result as string,
-          type: fileExtension
+          type: fileExtension,
+          file: file
         };
         setUploadedFiles(prev => [...prev, newFile]);
+        toast({
+          title: "File Uploaded",
+          description: `${file.name} has been successfully uploaded.`,
+        });
       };
       reader.readAsText(file);
     });
+
+    // Reset input
+    event.target.value = '';
   };
 
   const removeFile = (id: string) => {
     setUploadedFiles(prev => prev.filter(file => file.id !== id));
+    toast({
+      title: "File Removed",
+      description: "File has been removed from the upload list.",
+    });
   };
 
   const handleSubmit = async () => {
@@ -98,19 +112,19 @@ const HomePage = () => {
       title: "Market Analysis",
       prompt: "Analyze current market trends and competitive landscape for",
       icon: <Target className="h-8 w-8" />,
-      gradient: "from-violet-600 via-purple-600 to-pink-600"
+      gradient: "from-emerald-600 via-teal-600 to-cyan-600"
     },
     {
       title: "Technical Research", 
       prompt: "Provide comprehensive technical overview and implementation for",
       icon: <Zap className="h-8 w-8" />,
-      gradient: "from-blue-600 via-cyan-600 to-teal-600"
+      gradient: "from-amber-600 via-orange-600 to-red-600"
     },
     {
       title: "Innovation Impact",
       prompt: "Examine industry impact and future implications of",
       icon: <Star className="h-8 w-8" />,
-      gradient: "from-orange-600 via-red-600 to-pink-600"
+      gradient: "from-violet-600 via-purple-600 to-indigo-600"
     }
   ];
 
@@ -137,7 +151,7 @@ const HomePage = () => {
           {/* Hero Section */}
           <div className="text-center space-y-8">
             <div className="relative">
-              <h1 className="text-7xl md:text-8xl font-light gradient-text animate-glow mb-6">
+              <h1 className="text-7xl md:text-8xl font-light bg-gradient-to-r from-red-500 via-purple-500 to-blue-500 bg-clip-text text-transparent animate-glow mb-6">
                 Novah
               </h1>
               <p className="text-xl md:text-2xl text-gray-300 mb-8 font-light">
@@ -150,7 +164,7 @@ const HomePage = () => {
           <div className="max-w-3xl mx-auto">
             <AnimatedQuery 
               queries={animatedQueries}
-              onQueryClick={(selectedQuery) => setQuery(selectedQuery.replace('...', ''))}
+              onQueryClick={(selectedQuery) => setQuery(selectedQuery)}
             />
           </div>
 
@@ -162,7 +176,7 @@ const HomePage = () => {
                   placeholder="Enter your research query..."
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  className="min-h-32 bg-gray-700/30 border border-gray-600/50 text-white placeholder-gray-400 text-lg resize-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 rounded-xl backdrop-blur-sm input-border"
+                  className="min-h-32 bg-gray-700/30 border border-gray-600/50 text-white placeholder-gray-400 text-lg resize-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 rounded-xl backdrop-blur-sm"
                   maxLength={1000}
                 />
                 <div className="absolute bottom-3 right-3 text-xs text-gray-500">
