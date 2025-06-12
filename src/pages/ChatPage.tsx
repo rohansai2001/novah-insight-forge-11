@@ -4,22 +4,35 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Send, Map, X, Upload, Trash2, FileText, Brain } from 'lucide-react';
+import { ChevronDown, Brain, Send, Map, X, Upload, Trash2, FileText, CheckCircle, Loader } from 'lucide-react';
 import MindMap from '@/components/MindMap';
 import { toast } from '@/hooks/use-toast';
 import ThinkingProcess from '@/components/chat/ThinkingProcess';
 import StreamingText from '@/components/chat/StreamingText';
-import { geminiService, ThinkingStep, MindMapData } from '@/api/gemini';
-import { fileProcessor, ProcessedFile } from '@/api/fileProcessor';
 
 interface ChatMessage {
   id: string;
   type: 'user' | 'ai';
   content: string;
-  files?: ProcessedFile[];
+  files?: any[];
   thinking?: ThinkingStep[];
   sources?: string[];
   timestamp: Date;
+}
+
+interface ThinkingStep {
+  id: number;
+  type: 'planning' | 'researching' | 'sources' | 'analyzing' | 'replanning' | 'file_processing';
+  title: string;
+  content: string;
+  status: 'processing' | 'complete' | 'pending';
+}
+
+interface UploadedFile {
+  id: string;
+  name: string;
+  content: string;
+  type: string;
 }
 
 const ChatPage = () => {
@@ -28,11 +41,11 @@ const ChatPage = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentThinking, setCurrentThinking] = useState<ThinkingStep[]>([]);
   const [showMindMap, setShowMindMap] = useState(false);
-  const [mindMapData, setMindMapData] = useState<MindMapData | null>(null);
+  const [mindMapData, setMindMapData] = useState<any>(null);
   const [streamingContent, setStreamingContent] = useState('');
   const [originalQuery, setOriginalQuery] = useState('');
 
@@ -53,12 +66,12 @@ const ChatPage = () => {
       id: Date.now().toString(),
       type: 'user',
       content: query,
-      files: files || [],
+      files,
       timestamp: new Date()
     };
 
     setMessages([userMessage]);
-    await processResearchQuery(query, files || [], deepResearch);
+    await processResearchQuery(query, files, deepResearch);
   };
 
   const processResearchQuery = async (query: string, files: any[], deepResearch: boolean) => {
@@ -66,12 +79,32 @@ const ChatPage = () => {
     setStreamingContent('');
 
     try {
-      // Generate thinking steps
-      const thinkingSteps = await geminiService.generateThinkingSteps(query, files.length > 0);
-      setCurrentThinking(thinkingSteps);
+      const formData = new FormData();
+      formData.append('query', query);
+      formData.append('deepResearch', deepResearch.toString());
+      
+      files.forEach((file: any) => {
+        if (file instanceof File) {
+          formData.append('files', file);
+        }
+      });
+
+      const response = await fetch('http://localhost:3001/api/research', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get research response');
+      }
+
+      const data = await response.json();
+      
+      // Set thinking steps
+      setCurrentThinking(data.thinkingSteps);
       
       // Simulate step-by-step completion
-      for (let i = 0; i < thinkingSteps.length; i++) {
+      for (let i = 0; i < data.thinkingSteps.length; i++) {
         await new Promise(resolve => setTimeout(resolve, 1000));
         setCurrentThinking(prev => 
           prev.map((step, index) => 
@@ -80,26 +113,20 @@ const ChatPage = () => {
         );
       }
 
-      // Generate response and mind map
-      const [responseData, mindMapData] = await Promise.all([
-        geminiService.generateResponse(query, '', files),
-        geminiService.generateMindMap(query, files)
-      ]);
-
       // Start streaming response
-      setStreamingContent(responseData.content);
+      setStreamingContent(data.response.content);
 
       const aiMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         type: 'ai',
-        content: responseData.content,
-        thinking: thinkingSteps,
-        sources: responseData.sources,
+        content: data.response.content,
+        thinking: data.thinkingSteps,
+        sources: data.response.sources,
         timestamp: new Date()
       };
 
       setMessages(prev => [...prev, aiMessage]);
-      setMindMapData(mindMapData);
+      setMindMapData(data.mindMap);
       setCurrentThinking([]);
 
     } catch (error) {
@@ -118,37 +145,64 @@ const ChatPage = () => {
   const handleSendMessage = async () => {
     if (!newMessage.trim() && uploadedFiles.length === 0) return;
 
-    let processedFiles: ProcessedFile[] = [];
-    if (uploadedFiles.length > 0) {
-      processedFiles = await fileProcessor.processFiles(uploadedFiles);
-    }
-
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       type: 'user',
       content: newMessage,
-      files: processedFiles.length > 0 ? processedFiles : undefined,
+      files: uploadedFiles.length > 0 ? uploadedFiles : undefined,
       timestamp: new Date()
     };
 
     setMessages(prev => [...prev, userMessage]);
     
     try {
-      const responseData = await geminiService.generateResponse(
-        newMessage, 
-        messages.map(m => m.content).join('\n'), 
-        processedFiles
-      );
+      const response = await fetch('http://localhost:3001/api/followup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          query: newMessage,
+          context: messages.map(m => m.content).join('\n'),
+          files: uploadedFiles
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get follow-up response');
+      }
+
+      const data = await response.json();
       
       const aiMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         type: 'ai',
-        content: responseData.content,
-        sources: responseData.sources,
+        content: data.response.content,
+        thinking: data.response.thinkingSteps,
+        sources: data.response.sources,
         timestamp: new Date()
       };
 
       setMessages(prev => [...prev, aiMessage]);
+      
+      // Add new node to mind map if relevant
+      if (mindMapData && newMessage.length > 10) {
+        const newNodeId = `followup_${Date.now()}`;
+        const newNode = {
+          id: newNodeId,
+          label: newMessage.substring(0, 20) + '...',
+          type: 'sub',
+          level: 2,
+          parentId: 'center',
+          expanded: false,
+          hasChildren: false
+        };
+        
+        setMindMapData(prev => ({
+          nodes: [...prev.nodes, newNode],
+          edges: [...prev.edges, { source: 'center', target: newNodeId }]
+        }));
+      }
 
     } catch (error) {
       console.error('Error sending follow-up:', error);
@@ -167,8 +221,19 @@ const ChatPage = () => {
     const files = event.target.files;
     if (!files) return;
 
-    const newFiles = Array.from(files);
-    setUploadedFiles(prev => [...prev, ...newFiles]);
+    Array.from(files).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const newFile: UploadedFile = {
+          id: Math.random().toString(36).substr(2, 9),
+          name: file.name,
+          content: e.target?.result as string,
+          type: '.' + file.name.split('.').pop()?.toLowerCase()
+        };
+        setUploadedFiles(prev => [...prev, newFile]);
+      };
+      reader.readAsText(file);
+    });
   };
 
   const generateMindMap = () => {
@@ -184,12 +249,12 @@ const ChatPage = () => {
   };
 
   return (
-    <div className="min-h-screen relative bg-gradient-to-br from-slate-900 via-gray-900 to-slate-800">
+    <div className="min-h-screen relative">
       {/* Header */}
-      <div className="sticky top-0 z-40 glass-effect border-b border-slate-700/50 p-4 backdrop-blur-xl">
+      <div className="sticky top-0 z-40 glass-effect border-b border-gray-700/50 p-4">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <h1 
-            className="text-3xl font-extralight bg-gradient-to-r from-red-500 via-purple-500 to-blue-500 bg-clip-text text-transparent cursor-pointer hover:scale-105 transition-transform"
+            className="text-3xl font-light gradient-text cursor-pointer hover:scale-105 transition-transform"
             onClick={() => navigate('/')}
           >
             Novah
@@ -199,17 +264,17 @@ const ChatPage = () => {
             {mindMapData && !showMindMap && (
               <Button
                 onClick={generateMindMap}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
               >
                 <Map className="h-4 w-4 mr-2" />
-                View Mind Map
+                Generate Mind Map
               </Button>
             )}
             {showMindMap && (
               <Button
                 variant="outline"
                 onClick={() => setShowMindMap(false)}
-                className="glass-effect border-slate-600/50 text-white hover:bg-slate-700/50 backdrop-blur-sm"
+                className="glass-effect border-gray-600/50 text-white hover:bg-gray-700/50"
               >
                 <X className="h-4 w-4 mr-2" />
                 Hide Mind Map
@@ -227,10 +292,10 @@ const ChatPage = () => {
             <div className="max-w-4xl mx-auto space-y-6">
               {messages.map((message) => (
                 <div key={message.id} className={`message-fade-in ${message.type === 'user' ? 'flex justify-end' : 'flex justify-start'}`}>
-                  <Card className={`max-w-3xl p-6 backdrop-blur-xl ${
+                  <Card className={`max-w-3xl p-6 ${
                     message.type === 'user' 
-                      ? 'bg-gradient-to-r from-blue-600/20 to-purple-600/20 text-white ml-auto glass-effect border-2 border-blue-500/30' 
-                      : 'glass-effect text-white border border-slate-700/50'
+                      ? 'bg-gradient-to-r from-purple-600/20 to-pink-600/20 text-white ml-auto glass-effect border border-purple-500/20' 
+                      : 'glass-effect text-white border-gray-700/50'
                   }`}>
                     {message.type === 'user' ? (
                       <div className="space-y-3">
@@ -239,7 +304,7 @@ const ChatPage = () => {
                           <div className="space-y-2">
                             <p className="text-sm opacity-80">Attached Files:</p>
                             {message.files.map((file, index) => (
-                              <div key={index} className="flex items-center space-x-2 bg-white/10 p-3 rounded-lg border border-blue-400/30">
+                              <div key={index} className="flex items-center space-x-2 bg-white/10 p-3 rounded-lg">
                                 <FileText className="h-4 w-4" />
                                 <span className="text-sm">{file.name}</span>
                               </div>
@@ -258,8 +323,8 @@ const ChatPage = () => {
                         </div>
                         
                         {message.sources && (
-                          <div className="border-t border-slate-600/50 pt-4 mt-6">
-                            <h4 className="font-medium text-blue-400 mb-3">Sources:</h4>
+                          <div className="border-t border-gray-700/50 pt-4 mt-6">
+                            <h4 className="font-medium text-purple-400 mb-3">Sources:</h4>
                             <ul className="space-y-2">
                               {message.sources.map((source, index) => (
                                 <li key={index} className="text-sm">
@@ -267,7 +332,7 @@ const ChatPage = () => {
                                     href={source} 
                                     target="_blank" 
                                     rel="noopener noreferrer" 
-                                    className="text-gray-300 hover:text-blue-400 transition-colors hover:underline"
+                                    className="text-gray-300 hover:text-purple-400 transition-colors hover:underline"
                                   >
                                     {source}
                                   </a>
@@ -287,7 +352,7 @@ const ChatPage = () => {
                   <div className="max-w-3xl">
                     <ThinkingProcess steps={currentThinking} isVisible={true} />
                     {streamingContent && (
-                      <Card className="glass-effect text-white border border-slate-700/50 mt-4 p-6 backdrop-blur-xl">
+                      <Card className="glass-effect text-white border-gray-700/50 mt-4 p-6">
                         <StreamingText content={streamingContent} />
                       </Card>
                     )}
@@ -300,20 +365,20 @@ const ChatPage = () => {
           </div>
 
           {/* Chat Input */}
-          <div className="p-6 border-t border-slate-700/50 glass-effect backdrop-blur-xl">
+          <div className="p-6 border-t border-gray-700/50 glass-effect">
             <div className="max-w-4xl mx-auto">
               {uploadedFiles.length > 0 && (
                 <div className="mb-4 space-y-2">
-                  {uploadedFiles.map((file, index) => (
-                    <div key={index} className="flex items-center justify-between glass-effect p-3 rounded-lg border border-slate-600/30 backdrop-blur-sm">
+                  {uploadedFiles.map((file) => (
+                    <div key={file.id} className="flex items-center justify-between glass-effect p-3 rounded-lg border border-gray-600/30">
                       <div className="flex items-center space-x-2">
-                        <FileText className="h-4 w-4 text-blue-400" />
+                        <FileText className="h-4 w-4 text-purple-400" />
                         <span className="text-white text-sm">{file.name}</span>
                       </div>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setUploadedFiles(prev => prev.filter((_, i) => i !== index))}
+                        onClick={() => setUploadedFiles(prev => prev.filter(f => f.id !== file.id))}
                         className="text-red-400 hover:text-red-300"
                       >
                         <Trash2 className="h-3 w-3" />
@@ -329,7 +394,7 @@ const ChatPage = () => {
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-                  className="flex-1 bg-slate-800/50 border-2 border-slate-600/50 text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 backdrop-blur-sm transition-all duration-300"
+                  className="flex-1 bg-gray-700/30 border border-gray-600/50 text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 input-border"
                 />
 
                 <label className="cursor-pointer">
@@ -340,7 +405,7 @@ const ChatPage = () => {
                     onChange={handleFileUpload}
                     className="hidden"
                   />
-                  <Button variant="outline" className="glass-effect border-slate-600/50 text-white hover:bg-slate-700/50 backdrop-blur-sm">
+                  <Button variant="outline" className="glass-effect border-gray-600/50 text-white hover:bg-gray-700/50">
                     <Upload className="h-4 w-4" />
                   </Button>
                 </label>
@@ -348,7 +413,7 @@ const ChatPage = () => {
                 <Button 
                   onClick={handleSendMessage}
                   disabled={!newMessage.trim() && uploadedFiles.length === 0}
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
                 >
                   <Send className="h-4 w-4" />
                 </Button>
@@ -359,13 +424,10 @@ const ChatPage = () => {
 
         {/* Mind Map */}
         {showMindMap && (
-          <div className="mind-map-container w-1/2 border-l border-slate-700/50">
-            <div className="h-full flex flex-col glass-effect backdrop-blur-xl">
-              <div className="p-4 border-b border-slate-700/50 flex items-center justify-between">
-                <h3 className="text-white font-medium flex items-center">
-                  <Brain className="h-5 w-5 mr-2 text-blue-400" />
-                  Research Mind Map
-                </h3>
+          <div className="mind-map-container w-1/2 border-l border-gray-700/50">
+            <div className="h-full flex flex-col glass-effect">
+              <div className="p-4 border-b border-gray-700/50 flex items-center justify-between">
+                <h3 className="text-white font-medium">Research Mind Map</h3>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -376,7 +438,7 @@ const ChatPage = () => {
                 </Button>
               </div>
               <div className="flex-1">
-                {mindMapData && <MindMap data={mindMapData} query={originalQuery} />}
+                <MindMap data={mindMapData} query={originalQuery} />
               </div>
             </div>
           </div>
