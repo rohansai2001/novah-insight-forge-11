@@ -7,7 +7,6 @@ import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Upload, ArrowRight, Sparkles } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import AnimatedQuery from '@/components/home/AnimatedQuery';
 import SuggestionCards from '@/components/home/SuggestionCards';
 import FileUploadArea from '@/components/home/FileUploadArea';
 
@@ -25,13 +24,6 @@ const HomePage = () => {
   const [deepResearch, setDeepResearch] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-
-  const animatedQueries = [
-    "Analyze market trends in renewable energy sector",
-    "Research the impact of AI on healthcare innovation", 
-    "Explore blockchain applications in supply chain",
-    "Investigate quantum computing breakthrough potential"
-  ];
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -130,14 +122,6 @@ const HomePage = () => {
                 Advanced AI Research Assistant
               </p>
             </div>
-          </div>
-
-          {/* Animated Query Examples */}
-          <div className="max-w-3xl mx-auto">
-            <AnimatedQuery 
-              queries={animatedQueries}
-              onQueryClick={(selectedQuery) => setQuery(selectedQuery)}
-            />
           </div>
 
           {/* Main Input Card */}
