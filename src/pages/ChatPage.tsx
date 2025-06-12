@@ -2,13 +2,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { ChevronDown, Brain, Send, Map, X, Upload, Trash2, FileText, CheckCircle, Loader } from 'lucide-react';
+import { Map, X } from 'lucide-react';
 import MindMap from '@/components/MindMap';
 import { toast } from '@/hooks/use-toast';
 import ThinkingProcess from '@/components/chat/ThinkingProcess';
 import StreamingText from '@/components/chat/StreamingText';
+import MessageBubble from '@/components/chat/MessageBubble';
+import ChatInput from '@/components/chat/ChatInput';
 import { aiService } from '@/services/aiService';
 
 interface ChatMessage {
@@ -85,10 +85,8 @@ const ChatPage = () => {
       
       const data = await aiService.processResearch(query, files, deepResearch);
       
-      // Set thinking steps
       setCurrentThinking(data.thinkingSteps);
       
-      // Simulate step-by-step completion
       for (let i = 0; i < data.thinkingSteps.length; i++) {
         await new Promise(resolve => setTimeout(resolve, 1500));
         setCurrentThinking(prev => 
@@ -98,10 +96,8 @@ const ChatPage = () => {
         );
       }
 
-      // Start streaming response
       setStreamingContent(data.response.content);
       
-      // Wait a bit for streaming effect
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       const aiMessage: ChatMessage = {
@@ -155,10 +151,8 @@ const ChatPage = () => {
         uploadedFiles
       );
       
-      // Set thinking steps
       setCurrentThinking(data.thinkingSteps);
       
-      // Simulate step-by-step completion
       for (let i = 0; i < data.thinkingSteps.length; i++) {
         await new Promise(resolve => setTimeout(resolve, 1000));
         setCurrentThinking(prev => 
@@ -180,7 +174,6 @@ const ChatPage = () => {
       setMessages(prev => [...prev, aiMessage]);
       setCurrentThinking([]);
       
-      // Add new node to mind map if relevant
       if (mindMapData && newMessage.length > 10) {
         const newNodeId = `followup_${Date.now()}`;
         const newNode = {
@@ -239,7 +232,6 @@ const ChatPage = () => {
       reader.readAsText(file);
     });
 
-    // Reset input
     event.target.value = '';
   };
 
@@ -256,12 +248,12 @@ const ChatPage = () => {
   };
 
   return (
-    <div className="min-h-screen relative">
+    <div className="min-h-screen relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Header */}
-      <div className="sticky top-0 z-40 glass-effect border-b border-gray-700/50 p-4">
+      <div className="sticky top-0 z-40 bg-slate-800/40 border-b border-slate-700/50 backdrop-blur-sm p-4">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <h1 
-            className="text-3xl font-light bg-gradient-to-r from-red-500 via-purple-500 to-blue-500 bg-clip-text text-transparent cursor-pointer hover:scale-105 transition-transform"
+            className="text-3xl font-extralight bg-gradient-to-r from-red-500 via-purple-500 via-blue-500 to-cyan-500 bg-clip-text text-transparent cursor-pointer hover:scale-105 transition-transform"
             onClick={() => navigate('/')}
           >
             Novah
@@ -271,17 +263,17 @@ const ChatPage = () => {
             {mindMapData && !showMindMap && (
               <Button
                 onClick={generateMindMap}
-                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+                className="bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-700 hover:to-cyan-700 text-white"
               >
                 <Map className="h-4 w-4 mr-2" />
-                Generate Mind Map
+                View Mind Map
               </Button>
             )}
             {showMindMap && (
               <Button
                 variant="outline"
                 onClick={() => setShowMindMap(false)}
-                className="glass-effect border-gray-600/50 text-white hover:bg-gray-700/50"
+                className="bg-slate-700/30 border border-slate-600/50 text-white hover:bg-slate-700/50"
               >
                 <X className="h-4 w-4 mr-2" />
                 Hide Mind Map
@@ -298,60 +290,7 @@ const ChatPage = () => {
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
             <div className="max-w-4xl mx-auto space-y-6">
               {messages.map((message) => (
-                <div key={message.id} className={`message-fade-in ${message.type === 'user' ? 'flex justify-end' : 'flex justify-start'}`}>
-                  <Card className={`max-w-3xl p-6 ${
-                    message.type === 'user' 
-                      ? 'bg-gradient-to-r from-purple-600/20 to-pink-600/20 text-white ml-auto glass-effect border border-purple-500/20' 
-                      : 'glass-effect text-white border-gray-700/50'
-                  }`}>
-                    {message.type === 'user' ? (
-                      <div className="space-y-3">
-                        <p className="text-lg leading-relaxed">{message.content}</p>
-                        {message.files && message.files.length > 0 && (
-                          <div className="space-y-2">
-                            <p className="text-sm opacity-80">Attached Files:</p>
-                            {message.files.map((file, index) => (
-                              <div key={index} className="flex items-center space-x-2 bg-white/10 p-3 rounded-lg">
-                                <FileText className="h-4 w-4" />
-                                <span className="text-sm">{file.name}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {message.thinking && (
-                          <ThinkingProcess steps={message.thinking} isVisible={true} />
-                        )}
-                        
-                        <div className="prose prose-invert max-w-none">
-                          <StreamingText content={message.content} />
-                        </div>
-                        
-                        {message.sources && (
-                          <div className="border-t border-gray-700/50 pt-4 mt-6">
-                            <h4 className="font-medium text-purple-400 mb-3">Sources:</h4>
-                            <ul className="space-y-2">
-                              {message.sources.map((source, index) => (
-                                <li key={index} className="text-sm">
-                                  <a 
-                                    href={source} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer" 
-                                    className="text-gray-300 hover:text-purple-400 transition-colors hover:underline"
-                                  >
-                                    {source}
-                                  </a>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </Card>
-                </div>
+                <MessageBubble key={message.id} message={message} />
               ))}
 
               {isProcessing && (
@@ -359,9 +298,9 @@ const ChatPage = () => {
                   <div className="max-w-3xl">
                     <ThinkingProcess steps={currentThinking} isVisible={true} />
                     {streamingContent && (
-                      <Card className="glass-effect text-white border-gray-700/50 mt-4 p-6">
+                      <div className="bg-slate-800/50 text-white border border-slate-700/50 backdrop-blur-sm rounded-lg mt-4 p-6">
                         <StreamingText content={streamingContent} />
-                      </Card>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -372,79 +311,28 @@ const ChatPage = () => {
           </div>
 
           {/* Chat Input */}
-          <div className="p-6 border-t border-gray-700/50 glass-effect">
-            <div className="max-w-4xl mx-auto">
-              {uploadedFiles.length > 0 && (
-                <div className="mb-4 space-y-2">
-                  {uploadedFiles.map((file) => (
-                    <div key={file.id} className="flex items-center justify-between glass-effect p-3 rounded-lg border border-gray-600/30">
-                      <div className="flex items-center space-x-2">
-                        <FileText className="h-4 w-4 text-purple-400" />
-                        <span className="text-white text-sm">{file.name}</span>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setUploadedFiles(prev => prev.filter(f => f.id !== file.id))}
-                        className="text-red-400 hover:text-red-300"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex space-x-3">
-                <Input
-                  placeholder="Ask a follow-up question..."
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-                  className="flex-1 bg-gray-700/30 border border-gray-600/50 text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                  disabled={isProcessing}
-                />
-
-                <label className="cursor-pointer">
-                  <input
-                    type="file"
-                    multiple
-                    accept=".txt,.pdf,.doc,.docx"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                  <Button 
-                    variant="outline" 
-                    className="glass-effect border-gray-600/50 text-white hover:bg-gray-700/50"
-                    disabled={isProcessing}
-                  >
-                    <Upload className="h-4 w-4" />
-                  </Button>
-                </label>
-
-                <Button 
-                  onClick={handleSendMessage}
-                  disabled={(!newMessage.trim() && uploadedFiles.length === 0) || isProcessing}
-                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </div>
+          <ChatInput
+            message={newMessage}
+            onMessageChange={setNewMessage}
+            onSendMessage={handleSendMessage}
+            onFileUpload={handleFileUpload}
+            uploadedFiles={uploadedFiles}
+            onRemoveFile={(id) => setUploadedFiles(prev => prev.filter(f => f.id !== id))}
+            isProcessing={isProcessing}
+          />
         </div>
 
         {/* Mind Map */}
         {showMindMap && (
-          <div className="mind-map-container w-1/2 border-l border-gray-700/50">
-            <div className="h-full flex flex-col glass-effect">
-              <div className="p-4 border-b border-gray-700/50 flex items-center justify-between">
+          <div className="mind-map-container w-1/2 border-l border-slate-700/50">
+            <div className="h-full flex flex-col bg-slate-800/50">
+              <div className="p-4 border-b border-slate-700/50 flex items-center justify-between">
                 <h3 className="text-white font-medium">Research Mind Map</h3>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowMindMap(false)}
-                  className="text-gray-400 hover:text-white"
+                  className="text-slate-400 hover:text-white"
                 >
                   <X className="h-4 w-4" />
                 </Button>

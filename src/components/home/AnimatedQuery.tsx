@@ -1,18 +1,20 @@
+
 import React, { useState, useEffect } from 'react';
+
 interface AnimatedQueryProps {
   queries: string[];
   onQueryClick: (query: string) => void;
 }
-const AnimatedQuery = ({
-  queries,
-  onQueryClick
-}: AnimatedQueryProps) => {
+
+const AnimatedQuery = ({ queries, onQueryClick }: AnimatedQueryProps) => {
   const [currentQueryIndex, setCurrentQueryIndex] = useState(0);
   const [displayedText, setDisplayedText] = useState('');
   const [isTyping, setIsTyping] = useState(true);
   const [currentCharIndex, setCurrentCharIndex] = useState(0);
+
   useEffect(() => {
     const currentQuery = queries[currentQueryIndex];
+    
     if (isTyping && currentCharIndex < currentQuery.length) {
       const timer = setTimeout(() => {
         setDisplayedText(prev => prev + currentQuery[currentCharIndex]);
@@ -34,8 +36,20 @@ const AnimatedQuery = ({
       return () => clearTimeout(timer);
     }
   }, [currentQueryIndex, currentCharIndex, isTyping, queries]);
-  return <div className="relative cursor-pointer group min-h-[120px] flex items-center justify-center" onClick={() => onQueryClick(queries[currentQueryIndex])}>
+
+  return (
+    <div 
+      className="relative cursor-pointer group min-h-[60px] flex items-center justify-center bg-slate-800/30 border border-slate-600/30 rounded-xl p-4 hover:border-emerald-400/50 transition-all duration-300"
+      onClick={() => onQueryClick(queries[currentQueryIndex])}
+    >
+      <div className="text-lg text-slate-300 text-center leading-relaxed">
+        {displayedText}
+        <span className="animate-pulse ml-1 text-emerald-400">|</span>
+      </div>
       
-    </div>;
+      <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 via-cyan-500/10 to-blue-500/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+    </div>
+  );
 };
+
 export default AnimatedQuery;
