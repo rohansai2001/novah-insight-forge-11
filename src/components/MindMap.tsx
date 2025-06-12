@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -112,16 +111,7 @@ const MindMap = ({ data }: MindMapProps) => {
               name: 'cose',
               fit: true,
               padding: 30,
-              randomize: false,
-              componentSpacing: 100,
-              nodeRepulsion: 400000,
-              edgeElasticity: 100,
-              nestingFactor: 5,
-              gravity: 80,
-              numIter: 1000,
-              initialTemp: 200,
-              coolingFactor: 0.95,
-              minTemp: 1.0
+              randomize: false
             }
           });
 
