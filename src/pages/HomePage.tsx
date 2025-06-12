@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -21,6 +20,13 @@ const HomePage = () => {
   const [deepResearch, setDeepResearch] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  const animatedQueries = [
+    "Analyze market trends in renewable energy sector...",
+    "Research the impact of AI on healthcare innovation...",
+    "Explore blockchain applications in supply chain...",
+    "Investigate quantum computing breakthrough potential..."
+  ];
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -91,19 +97,19 @@ const HomePage = () => {
       title: "Market Analysis",
       prompt: "Analyze current market trends and competitive landscape for",
       icon: <Target className="h-8 w-8" />,
-      gradient: "from-violet-500 via-purple-500 to-pink-500"
+      gradient: "from-violet-600 via-purple-600 to-pink-600"
     },
     {
       title: "Technical Research", 
       prompt: "Provide comprehensive technical overview and implementation for",
       icon: <Zap className="h-8 w-8" />,
-      gradient: "from-blue-500 via-cyan-500 to-teal-500"
+      gradient: "from-blue-600 via-cyan-600 to-teal-600"
     },
     {
       title: "Innovation Impact",
       prompt: "Examine industry impact and future implications of",
       icon: <Star className="h-8 w-8" />,
-      gradient: "from-orange-500 via-red-500 to-pink-500"
+      gradient: "from-orange-600 via-red-600 to-pink-600"
     }
   ];
 
@@ -111,15 +117,15 @@ const HomePage = () => {
     <div className="min-h-screen relative overflow-hidden">
       {/* Animated background */}
       <div className="absolute inset-0">
-        {[...Array(50)].map((_, i) => (
+        {[...Array(60)].map((_, i) => (
           <div
             key={i}
-            className="absolute w-1 h-1 bg-white rounded-full opacity-20 animate-float"
+            className="absolute w-1 h-1 bg-purple-400/20 rounded-full animate-float"
             style={{
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 5}s`,
-              animationDuration: `${3 + Math.random() * 4}s`
+              animationDelay: `${Math.random() * 8}s`,
+              animationDuration: `${4 + Math.random() * 6}s`
             }}
           />
         ))}
@@ -130,24 +136,32 @@ const HomePage = () => {
           {/* Hero Section */}
           <div className="text-center space-y-8">
             <div className="relative">
-              <h1 className="text-8xl md:text-9xl font-bold gradient-text animate-glow mb-4">
+              <h1 className="text-7xl md:text-8xl font-light gradient-text animate-glow mb-6">
                 Novah
               </h1>
-              <p className="text-2xl md:text-3xl text-gray-300 mb-8">
+              <p className="text-xl md:text-2xl text-gray-300 mb-8 font-light">
                 Advanced AI Research Assistant
               </p>
             </div>
           </div>
 
+          {/* Animated Query Examples */}
+          <div className="max-w-3xl mx-auto">
+            <AnimatedQuery 
+              queries={animatedQueries}
+              onQueryClick={(selectedQuery) => setQuery(selectedQuery.replace('...', ''))}
+            />
+          </div>
+
           {/* Main Input Card */}
-          <Card className="glass-effect p-8 border-0 shadow-2xl">
+          <Card className="glass-effect p-8 border-0 shadow-2xl max-w-4xl mx-auto">
             <div className="space-y-6">
               <div className="relative">
                 <Textarea
                   placeholder="Enter your research query..."
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  className="min-h-32 bg-white/5 border-white/10 text-white placeholder-gray-400 text-lg resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent rounded-xl backdrop-blur-sm"
+                  className="min-h-32 bg-gray-700/30 border border-gray-600/50 text-white placeholder-gray-400 text-lg resize-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 rounded-xl backdrop-blur-sm input-border"
                   maxLength={1000}
                 />
                 <div className="absolute bottom-3 right-3 text-xs text-gray-500">
@@ -183,7 +197,7 @@ const HomePage = () => {
                     />
                     <Button 
                       variant="outline" 
-                      className="glass-effect border-white/20 text-white hover:bg-white/10 hover:border-purple-500/50 transition-all duration-300 group-hover:scale-105"
+                      className="glass-effect border-gray-600/50 text-white hover:bg-gray-700/50 hover:border-purple-500/50 transition-all duration-300 group-hover:scale-105"
                     >
                       <Upload className="h-4 w-4 mr-2" />
                       Upload Files
@@ -215,7 +229,7 @@ const HomePage = () => {
 
           {/* Uploaded Files */}
           {uploadedFiles.length > 0 && (
-            <Card className="glass-effect border-0 p-6">
+            <Card className="glass-effect border-0 p-6 max-w-4xl mx-auto">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-white font-medium flex items-center">
                   <FileText className="h-5 w-5 mr-2 text-blue-400" />
@@ -256,16 +270,16 @@ const HomePage = () => {
           )}
 
           {/* Suggestion Cards */}
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
             {suggestionCards.map((card, index) => (
               <Card
                 key={index}
                 className="cursor-pointer group relative overflow-hidden border-0 hover:scale-105 transition-all duration-500 glass-effect"
                 onClick={() => setQuery(card.prompt + " ")}
               >
-                <div className={`absolute inset-0 bg-gradient-to-br ${card.gradient} opacity-10 group-hover:opacity-20 transition-opacity`}></div>
+                <div className={`absolute inset-0 bg-gradient-to-br ${card.gradient} opacity-5 group-hover:opacity-15 transition-opacity duration-500`}></div>
                 <div className="relative p-6 text-white">
-                  <div className="text-purple-400 mb-4 group-hover:scale-110 transition-transform">
+                  <div className="text-purple-400 mb-4 group-hover:scale-110 transition-transform duration-300">
                     {card.icon}
                   </div>
                   <h3 className="font-bold text-xl mb-3 group-hover:text-purple-300 transition-colors">

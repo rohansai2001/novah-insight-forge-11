@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -8,6 +7,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ChevronDown, Brain, Send, Map, X, Upload, Trash2, FileText, CheckCircle, Loader } from 'lucide-react';
 import MindMap from '@/components/MindMap';
 import { toast } from '@/hooks/use-toast';
+import ThinkingProcess from '@/components/chat/ThinkingProcess';
+import StreamingText from '@/components/chat/StreamingText';
 
 interface ChatMessage {
   id: string;
@@ -43,7 +44,7 @@ const ChatPage = () => {
   const [currentThinking, setCurrentThinking] = useState<ThinkingStep[]>([]);
   const [showMindMap, setShowMindMap] = useState(false);
   const [mindMapData, setMindMapData] = useState<any>(null);
-  const [streamingResponse, setStreamingResponse] = useState('');
+  const [streamingContent, setStreamingContent] = useState('');
   const [originalQuery, setOriginalQuery] = useState('');
 
   useEffect(() => {
@@ -56,7 +57,7 @@ const ChatPage = () => {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, streamingResponse]);
+  }, [messages, streamingContent]);
 
   const handleInitialQuery = async (query: string, files: any[], deepResearch: boolean) => {
     const userMessage: ChatMessage = {
@@ -73,7 +74,7 @@ const ChatPage = () => {
 
   const processResearchQuery = async (query: string, files: any[], deepResearch: boolean) => {
     setIsProcessing(true);
-    setStreamingResponse('');
+    setStreamingContent('');
 
     try {
       const formData = new FormData();
@@ -97,13 +98,12 @@ const ChatPage = () => {
 
       const data = await response.json();
       
-      // Simulate streaming response
-      const steps = data.response.thinkingSteps;
-      setCurrentThinking(steps);
+      // Set thinking steps
+      setCurrentThinking(data.thinkingSteps);
       
-      // Simulate step-by-step thinking
-      for (let i = 0; i < steps.length; i++) {
-        await new Promise(resolve => setTimeout(resolve, 800));
+      // Simulate step-by-step completion
+      for (let i = 0; i < data.thinkingSteps.length; i++) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
         setCurrentThinking(prev => 
           prev.map((step, index) => 
             index <= i ? { ...step, status: 'complete' } : step
@@ -111,25 +111,20 @@ const ChatPage = () => {
         );
       }
 
-      // Stream the response
-      const fullResponse = data.response.content;
-      for (let i = 0; i <= fullResponse.length; i += 3) {
-        setStreamingResponse(fullResponse.slice(0, i));
-        await new Promise(resolve => setTimeout(resolve, 20));
-      }
+      // Start streaming response
+      setStreamingContent(data.response.content);
 
       const aiMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         type: 'ai',
-        content: fullResponse,
-        thinking: steps,
+        content: data.response.content,
+        thinking: data.thinkingSteps,
         sources: data.response.sources,
         timestamp: new Date()
       };
 
       setMessages(prev => [...prev, aiMessage]);
       setMindMapData(data.mindMap);
-      setStreamingResponse('');
       setCurrentThinking([]);
 
     } catch (error) {
@@ -141,6 +136,7 @@ const ChatPage = () => {
       });
     } finally {
       setIsProcessing(false);
+      setStreamingContent('');
     }
   };
 
@@ -253,10 +249,10 @@ const ChatPage = () => {
   return (
     <div className="min-h-screen relative">
       {/* Header */}
-      <div className="sticky top-0 z-40 glass-effect border-b border-white/10 p-4">
+      <div className="sticky top-0 z-40 glass-effect border-b border-gray-700/50 p-4">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <h1 
-            className="text-4xl font-bold gradient-text cursor-pointer hover:scale-105 transition-transform"
+            className="text-3xl font-light gradient-text cursor-pointer hover:scale-105 transition-transform"
             onClick={() => navigate('/')}
           >
             Novah
@@ -276,7 +272,7 @@ const ChatPage = () => {
               <Button
                 variant="outline"
                 onClick={() => setShowMindMap(false)}
-                className="glass-effect border-white/20 text-white hover:bg-white/10"
+                className="glass-effect border-gray-600/50 text-white hover:bg-gray-700/50"
               >
                 <X className="h-4 w-4 mr-2" />
                 Hide Mind Map
@@ -296,8 +292,8 @@ const ChatPage = () => {
                 <div key={message.id} className={`message-fade-in ${message.type === 'user' ? 'flex justify-end' : 'flex justify-start'}`}>
                   <Card className={`max-w-3xl p-6 ${
                     message.type === 'user' 
-                      ? 'bg-gradient-to-r from-purple-600/20 to-pink-600/20 text-white ml-auto glass-effect' 
-                      : 'glass-effect text-white border-white/10'
+                      ? 'bg-gradient-to-r from-purple-600/20 to-pink-600/20 text-white ml-auto glass-effect border border-purple-500/20' 
+                      : 'glass-effect text-white border-gray-700/50'
                   }`}>
                     {message.type === 'user' ? (
                       <div className="space-y-3">
@@ -317,37 +313,15 @@ const ChatPage = () => {
                     ) : (
                       <div className="space-y-4">
                         {message.thinking && (
-                          <Collapsible defaultOpen>
-                            <CollapsibleTrigger className="flex items-center space-x-2 text-purple-400 hover:text-purple-300 transition-colors">
-                              <Brain className="h-4 w-4" />
-                              <span>Thinking Process</span>
-                              <ChevronDown className="h-4 w-4" />
-                            </CollapsibleTrigger>
-                            <CollapsibleContent className="mt-3 space-y-2">
-                              {message.thinking.map((step, index) => (
-                                <div key={index} className="flex items-center space-x-3 p-3 glass-effect rounded-lg">
-                                  <CheckCircle className="h-4 w-4 text-green-400" />
-                                  <div>
-                                    <div className="font-medium text-white">{step.step}</div>
-                                    <div className="text-sm text-gray-300">{step.details}</div>
-                                  </div>
-                                </div>
-                              ))}
-                            </CollapsibleContent>
-                          </Collapsible>
+                          <ThinkingProcess steps={message.thinking} isVisible={true} />
                         )}
                         
                         <div className="prose prose-invert max-w-none">
-                          <div 
-                            className="whitespace-pre-wrap leading-relaxed text-gray-100"
-                            dangerouslySetInnerHTML={{ 
-                              __html: message.content.replace(/\n/g, '<br>').replace(/#{1,6}\s/g, '<strong>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') 
-                            }} 
-                          />
+                          <StreamingText content={message.content} />
                         </div>
                         
                         {message.sources && (
-                          <div className="border-t border-white/10 pt-4">
+                          <div className="border-t border-gray-700/50 pt-4 mt-6">
                             <h4 className="font-medium text-purple-400 mb-3">Sources:</h4>
                             <ul className="space-y-2">
                               {message.sources.map((source, index) => (
@@ -373,46 +347,14 @@ const ChatPage = () => {
 
               {isProcessing && (
                 <div className="flex justify-start">
-                  <Card className="max-w-3xl p-6 glass-effect text-white border-white/10">
-                    <Collapsible defaultOpen>
-                      <CollapsibleTrigger className="flex items-center space-x-2 text-purple-400">
-                        <Brain className="h-4 w-4 animate-pulse" />
-                        <span>Processing...</span>
-                        <ChevronDown className="h-4 w-4" />
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="mt-3 space-y-2">
-                        {currentThinking.map((step, index) => (
-                          <div key={index} className="flex items-center space-x-3 p-3 glass-effect rounded-lg thinking-step">
-                            {step.status === 'complete' ? (
-                              <CheckCircle className="h-4 w-4 text-green-400" />
-                            ) : (
-                              <Loader className="h-4 w-4 text-purple-400 animate-spin" />
-                            )}
-                            <div>
-                              <div className="font-medium text-white">{step.step}</div>
-                              <div className="text-sm text-gray-300">{step.details}</div>
-                            </div>
-                          </div>
-                        ))}
-                      </CollapsibleContent>
-                    </Collapsible>
-                  </Card>
-                </div>
-              )}
-
-              {streamingResponse && (
-                <div className="flex justify-start">
-                  <Card className="max-w-3xl p-6 glass-effect text-white border-white/10">
-                    <div className="prose prose-invert max-w-none">
-                      <div 
-                        className="whitespace-pre-wrap leading-relaxed text-gray-100"
-                        dangerouslySetInnerHTML={{ 
-                          __html: streamingResponse.replace(/\n/g, '<br>').replace(/#{1,6}\s/g, '<strong>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') 
-                        }} 
-                      />
-                      <span className="inline-block w-2 h-5 bg-purple-400 streaming-cursor ml-1"></span>
-                    </div>
-                  </Card>
+                  <div className="max-w-3xl">
+                    <ThinkingProcess steps={currentThinking} isVisible={true} />
+                    {streamingContent && (
+                      <Card className="glass-effect text-white border-gray-700/50 mt-4 p-6">
+                        <StreamingText content={streamingContent} />
+                      </Card>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -421,12 +363,12 @@ const ChatPage = () => {
           </div>
 
           {/* Chat Input */}
-          <div className="p-6 border-t border-white/10 glass-effect">
+          <div className="p-6 border-t border-gray-700/50 glass-effect">
             <div className="max-w-4xl mx-auto">
               {uploadedFiles.length > 0 && (
                 <div className="mb-4 space-y-2">
                   {uploadedFiles.map((file) => (
-                    <div key={file.id} className="flex items-center justify-between glass-effect p-3 rounded-lg">
+                    <div key={file.id} className="flex items-center justify-between glass-effect p-3 rounded-lg border border-gray-600/30">
                       <div className="flex items-center space-x-2">
                         <FileText className="h-4 w-4 text-purple-400" />
                         <span className="text-white text-sm">{file.name}</span>
@@ -450,7 +392,7 @@ const ChatPage = () => {
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-                  className="flex-1 glass-effect border-white/20 text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="flex-1 bg-gray-700/30 border border-gray-600/50 text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 input-border"
                 />
 
                 <label className="cursor-pointer">
@@ -461,7 +403,7 @@ const ChatPage = () => {
                     onChange={handleFileUpload}
                     className="hidden"
                   />
-                  <Button variant="outline" className="glass-effect border-white/20 text-white hover:bg-white/10">
+                  <Button variant="outline" className="glass-effect border-gray-600/50 text-white hover:bg-gray-700/50">
                     <Upload className="h-4 w-4" />
                   </Button>
                 </label>
@@ -480,9 +422,9 @@ const ChatPage = () => {
 
         {/* Mind Map */}
         {showMindMap && (
-          <div className="mind-map-container w-1/2 border-l border-white/10">
+          <div className="mind-map-container w-1/2 border-l border-gray-700/50">
             <div className="h-full flex flex-col glass-effect">
-              <div className="p-4 border-b border-white/10 flex items-center justify-between">
+              <div className="p-4 border-b border-gray-700/50 flex items-center justify-between">
                 <h3 className="text-white font-medium">Research Mind Map</h3>
                 <Button
                   variant="ghost"

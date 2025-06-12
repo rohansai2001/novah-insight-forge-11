@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,22 +48,22 @@ const MindMap = ({ data, query }: MindMapProps) => {
             {
               selector: 'node',
               style: {
-                'background-color': '#3b82f6',
+                'background-color': '#4f46e5',
                 'label': 'data(label)',
                 'color': '#ffffff',
                 'text-valign': 'center',
                 'text-halign': 'center',
-                'font-size': '11px',
+                'font-size': '10px',
                 'font-weight': 'bold',
-                'width': 'label',
-                'height': 'label',
-                'padding': '10px',
+                'width': 'mapData(chars, 5, 30, 60, 200)',
+                'height': 'mapData(chars, 5, 30, 40, 80)',
+                'padding': '8px',
                 'shape': 'round-rectangle',
                 'border-width': 2,
-                'border-color': '#1e40af',
+                'border-color': '#3730a3',
                 'text-wrap': 'wrap',
-                'text-max-width': '120px',
-                'min-width': '80px',
+                'text-max-width': 'mapData(chars, 5, 30, 50, 180)',
+                'min-width': '60px',
                 'min-height': '40px'
               }
             },
@@ -73,11 +72,11 @@ const MindMap = ({ data, query }: MindMapProps) => {
               style: {
                 'background-color': '#dc2626',
                 'border-color': '#991b1b',
-                'font-size': '14px',
+                'font-size': '12px',
                 'font-weight': 'bold',
-                'min-width': '140px',
-                'min-height': '60px',
-                'text-max-width': '130px'
+                'width': 'mapData(chars, 5, 25, 120, 180)',
+                'height': 'mapData(chars, 5, 25, 60, 90)',
+                'text-max-width': 'mapData(chars, 5, 25, 100, 160)'
               }
             },
             {
@@ -85,10 +84,10 @@ const MindMap = ({ data, query }: MindMapProps) => {
               style: {
                 'background-color': '#7c3aed',
                 'border-color': '#5b21b6',
-                'font-size': '12px',
-                'min-width': '100px',
-                'min-height': '50px',
-                'text-max-width': '90px'
+                'font-size': '11px',
+                'width': 'mapData(chars, 5, 20, 80, 140)',
+                'height': 'mapData(chars, 5, 20, 50, 70)',
+                'text-max-width': 'mapData(chars, 5, 20, 70, 120)'
               }
             },
             {
@@ -97,15 +96,26 @@ const MindMap = ({ data, query }: MindMapProps) => {
                 'background-color': '#059669',
                 'border-color': '#047857',
                 'font-size': '10px',
-                'min-width': '80px',
-                'min-height': '40px',
-                'text-max-width': '70px'
+                'width': 'mapData(chars, 5, 15, 70, 120)',
+                'height': 'mapData(chars, 5, 15, 45, 65)',
+                'text-max-width': 'mapData(chars, 5, 15, 60, 100)'
+              }
+            },
+            {
+              selector: 'node[type="detail"]',
+              style: {
+                'background-color': '#0891b2',
+                'border-color': '#0e7490',
+                'font-size': '9px',
+                'width': 'mapData(chars, 5, 12, 60, 100)',
+                'height': 'mapData(chars, 5, 12, 35, 55)',
+                'text-max-width': 'mapData(chars, 5, 12, 50, 80)'
               }
             },
             {
               selector: 'edge',
               style: {
-                'width': 3,
+                'width': 2,
                 'line-color': '#64748b',
                 'target-arrow-color': '#64748b',
                 'target-arrow-shape': 'triangle',
@@ -193,7 +203,8 @@ const MindMap = ({ data, query }: MindMapProps) => {
           label: node.label,
           type: node.type,
           level: node.level,
-          hasChildren: node.hasChildren
+          hasChildren: node.hasChildren,
+          chars: node.label.length
         }
       })),
       ...visibleEdges.map(edge => ({
@@ -379,9 +390,9 @@ const MindMap = ({ data, query }: MindMapProps) => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-gray-900">
+    <div className="h-full flex flex-col bg-gray-800/50">
       {/* Controls */}
-      <Card className="m-4 p-4 glass-effect border-white/10">
+      <Card className="m-4 p-4 glass-effect border-gray-700/50">
         <div className="space-y-3">
           <div className="flex space-x-2">
             <Input
@@ -466,7 +477,7 @@ const MindMap = ({ data, query }: MindMapProps) => {
       {/* Mind Map Canvas */}
       <div 
         ref={cyRef} 
-        className="flex-1 bg-gray-900 border-t border-white/10"
+        className="flex-1 bg-gray-800/50 border-t border-gray-700/50"
         style={{ 
           minHeight: '400px',
           position: 'relative'
