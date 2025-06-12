@@ -110,9 +110,6 @@ const MindMap = ({ data }: MindMapProps) => {
             ],
             layout: {
               name: 'cose',
-              idealEdgeLength: 100,
-              nodeOverlap: 20,
-              refresh: 20,
               fit: true,
               padding: 30,
               randomize: false,
